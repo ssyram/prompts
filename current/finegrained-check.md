@@ -1,111 +1,111 @@
 # /finegrained-check
 
-对目标做细粒度一致性检查。支持单文件、目录、项目、或任意主题。
+Run a fine-grained consistency check on a target. Supports a single file, a directory, a full project, or an arbitrary topic.
 
-用法：
-- `/finegrained-check <文件路径>` — 检查单个文档
-- `/finegrained-check <目录路径>` — 检查目录下所有相关文件的一致性
-- `/finegrained-check <主题描述>` — 对当前项目中与该主题相关的所有内容做一致性检查
+Usage:
+- `/finegrained-check <file-path>` - Check one document.
+- `/finegrained-check <directory-path>` - Check consistency across all relevant files in a directory.
+- `/finegrained-check <topic-description>` - Check consistency across all project content related to that topic.
 
-## 执行步骤
+## Execution Steps
 
-### Phase 0：范围确定
+### Phase 0: Scope Determination
 
-根据 `$ARGUMENTS` 判断检查范围：
+Determine the inspection scope based on `$ARGUMENTS`:
 
-**单文件**：直接读取。
-**目录**：列出目录下所有文件，按类型（代码/配置/文档/测试）分组，全部纳入。
-**主题/项目**：用 Glob + Grep 搜索相关文件（代码、配置、文档、测试），确定边界。
+**Single file**: Read it directly.
+**Directory**: List all files in the directory, group by type (code/config/docs/tests), include all.
+**Topic/project**: Use Glob + Grep to find relevant files (code/config/docs/tests) and define boundaries.
 
-输出检查范围清单：
+Output a scope checklist:
 ```
-检查范围：N 个文件
-- 代码：path1, path2, ...
-- 配置：path3, ...
-- 文档：path4, ...
-- 测试：path5, ...
+Scope: N files
+- Code: path1, path2, ...
+- Config: path3, ...
+- Docs: path4, ...
+- Tests: path5, ...
 ```
 
-### Phase 1：命题抽取
+### Phase 1: Proposition Extraction
 
-从所有范围内文件中提取**原子化命题**，编号 P1、P2、...：
+Extract **atomic propositions** from all files in scope, numbered P1, P2, ...:
 
-**代码文件**：提取接口契约、函数签名约束、类型不变量、错误处理假设、导入依赖关系
-**配置文件**：提取配置项语义、默认值、合法值范围、配置项间依赖
-**文档文件**：提取设计声明、行为规则、架构约束
-**跨文件**：提取 import/export 契约、API 调用方与被调用方的假设、事件发布者与订阅者的契约
+**Code files**: interface contracts, function signature constraints, type invariants, error-handling assumptions, import dependencies
+**Config files**: config semantics, default values, valid ranges, dependency relations among config fields
+**Doc files**: design claims, behavior rules, architecture constraints
+**Cross-file**: import/export contracts, caller/callee assumptions for APIs, publisher/subscriber contracts for events
 
-每条命题格式：`**Pn**: <主体> <动词> <约束>（来源：<文件:行号> 或 <Section>）`
+Proposition format: `**Pn**: <subject> <verb> <constraint> (source: <file:line> or <Section>)`
 
-目标：每 500 字/行约 5–10 条，不设上限。
+Target density: around 5-10 propositions per 500 words/lines, with no hard upper limit.
 
-### Phase 2：命题间矛盾与遗漏检查
+### Phase 2: Contradiction and Missing-Coverage Checks
 
-对所有命题做交叉检查（重点：**跨文件**的命题对）：
+Cross-check all propositions (with emphasis on **cross-file** proposition pairs):
 
-**矛盾**：两条命题对同一主体有相互否定的声明
-- 格式：`### 矛盾 N: Px vs Py`，说明冲突内容，标注严重程度
-- 常见模式：
-  - 类型签名不匹配（调用方传的参数 vs 被调方期望的参数）
-  - 事件名/字段名拼写不一致
-  - 同一概念在不同文件中有不同默认值
-  - 文档声明 vs 代码实现不一致
+**Contradiction**: two propositions make mutually incompatible claims about the same subject.
+- Format: `### Contradiction N: Px vs Py`, describe the conflict and label severity.
+- Common patterns:
+  - Signature mismatch (what caller passes vs what callee expects)
+  - Event/field name spelling mismatch
+  - Different default values for the same concept across files
+  - Documentation claim vs implementation behavior mismatch
 
-**遗漏**：某命题声明了 A，但 A 依赖的 B 在范围内没有命题覆盖
-- 格式：`### 遗漏 N: Px 依赖未定义的 <B>`，说明影响
-- 常见模式：
-  - import 了不存在的导出
-  - 调用了未注册的工具/命令/事件
-  - 配置项被读取但从未被定义
-  - prompt 中引用了不存在的工具名
+**Missing coverage**: proposition A depends on B, but no proposition covers B within scope.
+- Format: `### Missing N: Px depends on undefined <B>`, explain impact.
+- Common patterns:
+  - Imported export does not exist
+  - Tool/command/event is called but never registered
+  - Config is read but never defined
+  - A prompt references a nonexistent tool name
 
-严重程度：
-- 高：运行时错误、数据丢失、安全风险
-- 中：行为不确定、测试无法通过、功能降级
-- 低：文档不清晰、代码冗余、命名不一致
+Severity levels:
+- High: runtime failures, data loss, security risk
+- Medium: non-deterministic behavior, test failures, feature degradation
+- Low: unclear docs, redundant code, naming inconsistency
 
-### Phase 3：设计点交叉覆盖矩阵
+### Phase 3: Design-Point Cross-Coverage Matrix
 
-从命题中归纳 **8–20 个核心设计点**（D1–DN）。设计点可以是：
-- 模块/组件（如"task 系统"、"并发管理器"、"配置加载"）
-- 横切关注点（如"错误处理"、"生命周期管理"、"类型安全"）
-- 用户体验路径（如"后台任务完整流程"、"计划生成到执行"）
+From propositions, derive **8-20 core design points** (D1-DN). Design points may include:
+- Modules/components (for example: "task system", "concurrency manager", "config loading")
+- Cross-cutting concerns (for example: "error handling", "lifecycle management", "type safety")
+- User flow paths (for example: "full background-task flow", "plan generation to execution")
 
-对所有设计点两两组合，检查"A 与 B 的交互是否有命题覆盖"：
+For each pair of design points, check whether interaction coverage exists:
 
-| A | B | 覆盖？ | 位置/备注 |
-|---|---|--------|----------|
-| D1 | D2 | ✓ | file:line |
-| D1 | D3 | **✗** | 说明该交叉点为何重要、遗漏了什么 |
+| A | B | Covered? | Location/Notes |
+|---|---|----------|----------------|
+| D1 | D2 | yes | file:line |
+| D1 | D3 | **no** | Why this interaction matters and what is missing |
 
-重点标记所有 **✗** 行。
+Highlight all **no** rows.
 
-### Phase 4：总结
+### Phase 4: Summary
 
-**关键问题**（按严重度排列）：
-- 每条：问题描述 + 涉及文件 + 建议修复方向
+**Key issues** (ordered by severity):
+- For each issue: description + involved files + suggested fix direction
 
-**设计亮点**（可选）：
-- 逻辑自洽、设计优雅的地方
+**Design strengths** (optional):
+- Areas that are coherent and well-structured
 
-**数据摘要**：
-- 总命题数、矛盾数、遗漏数、矩阵空洞数
-- 高严重度问题列表（一句话每条）
+**Data summary**:
+- Total propositions, contradictions, missing items, matrix holes
+- High-severity issue list (one sentence each)
 
 ---
 
-## 输出
+## Output
 
-如果检查单文件：报告写入 `<文档同目录>/<文档名>_finegrained_report.md`
-如果检查目录/项目：报告写入 `<目录>/_finegrained_report.md`
+If checking a single file: write report to `<same-directory>/<filename>_finegrained_report.md`
+If checking a directory/project: write report to `<directory>/_finegrained_report.md`
 
-**写作流程**（防止 context 耗尽）：
-1. 先用 Write 写骨架（Phase 标题 + TODO 占位符）
-2. 逐节用 Edit 填充，每节完成再填下一节
+**Writing flow** (to avoid context exhaustion):
+1. Use Write to create a skeleton first (Phase headings + TODO placeholders).
+2. Fill section by section via Edit, and complete each section before the next one.
 
-## 汇报
+## Reporting
 
-完成后输出：
-- 检查范围（文件数、总行数）
-- 总命题数、矛盾数、遗漏数、矩阵空洞数
-- 高严重度问题列表（一句话每条）
+When complete, output:
+- Scope summary (file count, total line count)
+- Total propositions, contradictions, missing items, matrix holes
+- High-severity issue list (one sentence each)
