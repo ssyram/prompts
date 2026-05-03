@@ -101,13 +101,15 @@ State your chosen dimensions and *why each is relevant* before proceeding.
 
 **Step 3 — Compile findings.** Read all reports. Apply:
 
-**3a. Hoare finding vs code review nit.** A Hoare finding must have:
+**3a. Hoare finding vs code review nit — evidence requirements.** A Hoare finding must have:
 - A specific Pre/Post/Invariant that is violated, AND
-- A concrete counterexample (input, state, or execution path) that triggers the violation
+- A concrete counterexample (input, state, or execution path) that triggers the violation, AND
+- **For code findings**: a concrete test case, PoC script, or step-by-step reproduction that demonstrates the bug fires. "This could theoretically happen" is not sufficient — show it happening.
+- **For documentation findings** (stale content, contradictions, missing markers): triple-confirm that no other part of the document mitigates the issue (e.g., a changelog entry, a disclaimer paragraph, a cross-reference). If mitigation exists elsewhere in the document, downgrade to nit unless the mitigation is clearly insufficient for the document's primary use pattern (e.g., reference lookup vs sequential reading).
 
-Observations lacking both are **code review nits** — log separately in `docs/audit/RoundN/nits.md` if desired.
+Observations lacking the above are **code review nits** — log separately in `docs/audit/RoundN/nits.md` if desired.
 
-Exception: dead code / stale comments / unused params remain valid findings (maintainability signal-to-noise).
+Exception: dead code / stale comments / unused params remain valid findings (maintainability signal-to-noise), but still require citing the exact location and explaining why the staleness causes confusion or maintenance burden.
 
 **3b. Runtime impact trace.** For each candidate, trace whether the issue is **observable at runtime** given the deployment context:
 - Does the violating input actually reach the affected code path?
@@ -119,22 +121,42 @@ Exception: dead code / stale comments / unused params remain valid findings (mai
 - GUARDED / PARTIAL / UNVERIFIABLE → evaluate case-by-case
 - SAFE / PROVEN / CONFIRMED / NONE → no action
 
-**Step 4 — Independent confirmation.** Every candidate must be independently confirmed by a fresh agent that did not produce it. Fresh eyes only — do NOT give the agent the original report.
+**Step 4 — Independent Challenge (Disprove-First).** Every candidate must be independently **challenged** by ≥2 fresh agents that did not produce it. The challenger's job is to **disprove** the finding — find reasons it is wrong, overstated, or based on misreading. Fresh eyes only — do NOT give challengers the original audit report, only the specific claim.
 
-Give each confirmation agent:
+**Rationale**: Confirmation bias is the #1 source of false-positive audit findings. An agent asked to "confirm" a finding will look for evidence supporting it. An agent asked to "disprove" a finding will look for evidence against it. Findings that survive disproval attempts are far more reliable.
+
+Give each challenger:
 - The specific claim (file, function, description, proposed severity) and relevant source files.
 - The deployment context from Step 1.
+- Explicit instruction: "Your job is to find reasons this finding is WRONG. Look for evidence that contradicts it. Be adversarial."
 
-Require one of these verdicts in `docs/audit/RoundN/confirm-<finding-id>.md`:
-- **CONFIRMED — triggering**: concrete input/scenario/path that demonstrates the bug fires at runtime within the deployment context.
-- **CONFIRMED — solid rationale**: issue is real but not directly triggerable (defense-in-depth gap, API contract drift, stale comment, dead code). State rationale in maintainer-evaluable terms.
+Require one of these verdicts in `docs/audit/RoundN/challenge-<finding-id>.md`:
+- **UPHELD**: challenger tried to disprove but could not. Finding stands. Challenger must state what disproval angles were attempted and why they failed.
+- **WEAKENED**: finding is partially correct but overstated. Challenger must state what is correct and what is exaggerated, with evidence.
 - **REJECTED — deployment context mismatch**: claim assumes a threat model that doesn't match.
 - **REJECTED — not reachable**: claim assumes a state that invariant Y prevents; cite invariant.
-- **REJECTED — misreading**: reviewer misread the code; explain what it actually does.
-- **REJECTED — lesson precondition unmet**: finding cites a lesson whose preconditions don't hold here.
+- **REJECTED — misreading**: original auditor misread the code; explain what it actually does.
+- **REJECTED — mitigated**: the issue exists in isolation but is mitigated by another mechanism the auditor missed; cite the mitigation.
 - **INCONCLUSIVE**: cannot decide; state what would be needed.
 
-Batch up to 6 confirmations in parallel. Discard REJECTED and INCONCLUSIVE. Only CONFIRMED proceeds.
+Batch up to 6 challengers in parallel. Each finding needs ≥2 independent challengers.
+
+**Verdict aggregation**:
+- All challengers UPHELD → finding proceeds to Step 4.1
+- All challengers REJECTED → finding discarded (log in rejected findings)
+- Mixed verdicts (split) → finding proceeds to Step 4.1 with a "disputed" flag
+- All challengers WEAKENED → finding proceeds with adjusted severity/scope
+
+**Step 4.1 — Counter-Challenge (for surviving findings).** For each finding that survived Step 4 (UPHELD or disputed), launch one more fresh agent as a **counter-challenger**. This agent receives:
+- The original claim
+- A summary of the challenger verdicts (what disproval angles were tried)
+- Instruction: "Previous challengers tried to disprove this and failed. Make one final attempt. Look for angles they missed."
+
+If the counter-challenger also cannot disprove → finding is **confirmed**. If counter-challenger finds a valid disproval → finding is **disputed** and must be presented to the human with both sides' evidence in Step 8.
+
+**Step 4.2 — Lead Auditor Verification.** The lead auditor (you) must personally verify the key evidence for each confirmed finding by reading the actual source code. Do not rely solely on agent reports. For each finding, state: "I verified [specific evidence] at [file:line]" or "I could not verify [claim] — agents may have misread."
+
+For disputed findings, compile all sides' arguments and evidence into a balanced summary for the human decision gate.
 
 **Step 4.5 — Reduction and Classification ("只诛首恶" / Isolate Root Cause).**
 
@@ -185,10 +207,13 @@ Write `docs/correctness-audit.md` containing:
 - **Fix before re-prove**: Never accept a "known limitation" if the code can be changed to eliminate it.
 - **Strict verdicts**: PROVEN means every path was traced. If you skipped an edge case, it's PARTIAL.
 - **No annotations in source**: Proofs live in `docs/`, not as inline comments.
-- **Independent confirmation is mandatory**: No finding becomes a fix without Step 4 confirmation. Speculatives without a trigger or solid rationale are rejected and logged.
+- **Independent challenge is mandatory**: No finding becomes a fix without surviving Step 4 challenge. Speculatives without a trigger or solid rationale are rejected and logged. Findings that no challenger attempted to disprove are treated as unvetted.
 - **Rejected findings are logged, not forgotten**: Prevents re-raising the same false alarm.
 - **Dead code / stale comments / unused params are valid findings**: They don't need a runtime trigger — rationale is signal-to-noise.
 - **Non-Decisional first**: Always prioritize autonomous fixes. Only escalate to human when the decision fundamentally alters system design.
 - **Isolate root cause**: Step 4.5 pruning is mandatory every round. Never patch symptoms.
 - **Continuous spec refinement**: If a fix changes behavior boundaries, update the spec.
 - **Circuit breaker**: If the same module has confirmed findings in 3+ consecutive rounds, stop patching. Do a root cause analysis of why fixes keep generating new issues in that module.
+- **Disprove-first, not confirm-first**: The default stance toward any finding is skepticism. Findings must survive active disproval attempts before becoming actionable. An uncontested finding is weaker than a contested-and-surviving one.
+- **Evidence over assertion**: For code findings, "I believe this could happen" is not evidence. Show a concrete test case, PoC, or step-by-step trace that demonstrates the issue fires. For doc findings, show the exact text that is wrong AND confirm no other part of the document corrects or mitigates it.
+- **Disputed findings go to human**: If challengers and counter-challengers disagree, present both sides' evidence to the human. Do not resolve disputes by majority vote — present the arguments.
