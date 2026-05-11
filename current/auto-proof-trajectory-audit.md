@@ -1,13 +1,19 @@
 ---
 name: auto-proof-trajectory-audit
-description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定
+description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定。v2 基于 canada (成功 baseline) / ciim / imo / sphere-packing-3 四 session 实证扩展 anti-pattern 库、灰区判据、审视陷阱、detection 时机要求
 ---
 
-# Auto-Proof Trajectory Audit
+# Auto-Proof Trajectory Audit (v2)
 
 对 auto-proof-cc workflow 的一次 FSM 运行轨迹做事后审视。
 
-**本 SKILL 是自包含的**——审视判据全部内嵌于本文档（§2 阶段精神 / §3 最短路径与异常分类 / §4 best effort 判据 / §5 模型能力 vs 流程设计 / §6 anti-pattern 库 / §7 审视陷阱）。给定 §0 列出的 3 个输入文件即可执行；yaml 和设计文档用于根因分析时引用具体规则，**不是判据来源**。
+**v2 实证基线**：本 SKILL 的判据来自四份独立 audit：
+- **canada1998p5**——4 transitions 健康成功（Vieta-jumping textbook + mathlib API 现成）
+- **ciim2022p6**——312 transitions / 13h 失败（70 个 r{N} marker schema-game）
+- **imo2009p6**——733 transitions / 13h 失败（maintenance no-op + reviewer 代行 PLAN）
+- **sphere-packing-3**——26 transitions + 50 escape / 22h 失败（agent 自决写 FINAL_SESSION_SUMMARY）
+
+**本 SKILL 是自包含的**——审视判据全部内嵌于本文档（§2 阶段精神 / §3 路径与异常 / §4 best effort / §5 二分 / §6 anti-pattern 库 / §7 审视陷阱）。给定 §0 列出的 3 个输入文件即可执行；yaml 和设计文档用于根因分析时引用具体规则，**不是判据来源**。
 
 本 SKILL 是只读审视流程——**禁止修改 workflow 代码**，只产 audit 报告。
 
@@ -20,8 +26,8 @@ description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-
 | 输入 | 必需 | 路径形式 | 用途 |
 |---|---|---|---|
 | 1. `transitions.jsonl` | 必需 | 绝对路径 | 审视核心数据源；含每个成功 transition 的 source/target/timestamp/evidence |
-| 2. `auto-proof-cc.yaml` | 必需 | 绝对路径 | 索引 transition rules / hard guard 配置 / soft-gate prompt / agent instructions——用于根因分析时引用具体规则 |
-| 3. 设计文档 | 必需 | 绝对路径 | `principles.md` 优先；若无则 `design-report.compact.md`——用于根因分析时引用宪法原则 |
+| 2. `auto-proof-cc.yaml` | 必需 | 绝对路径 | 索引 transition rules / hard guard 配置 / soft-gate prompt / agent instructions |
+| 3. 设计文档 | 必需 | 绝对路径 | `principles.md` 优先；若无则 `design-report.compact.md`——根因分析时引用宪法原则 |
 | 4. work-dir | 可选 | 绝对路径 | git 仓库；如有则可看 commit diff / .lean 文件实际内容；大幅提升审视深度 |
 
 **`reviews.jsonl` 路径自动从 `transitions.jsonl` 同目录推断**——含 hard guard / soft-gate 的所有 `decision="fail"` 失败记录，是审视门禁失败的关键数据源。
@@ -61,40 +67,23 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 
 4 个 transition 闭合 1 个 entry。**任何偏离这条路径都是审视重点**——记录 + 根因分析必做。
 
+**v2 实证**：canada1998p5 用 4 transition 完美最短路径达成（无 retry / 无 escape / 无 routing back）；这是健康基线，证明 4-transition 最短路径在合适任务上是可达的。
+
 ### 1.3 非最短路径分类（每条都是重点审视对象）
 
-| 类型 | 含义 | 主要审视方向 |
-|---|---|---|
-| **A. R → P** | REVIEW REJECT → 退回 PLAN 重写 | REVIEW 的 reject_reason 是否触及 PLAN 实质？PLAN 上一轮哪里出了问题？ |
-| **B. V → P** | VERIFY routing PLAN | PLAN 策略层有问题（如 base-fact 选错 / polarity 错），需要重新规划 |
-| **C. V → I** | VERIFY routing IMPL | IMPL 没尽力 / tactic 选错 / 应能完成但没完成 |
-| **D. ANY → S_INFRA_REPAIR** | 任何状态触发 escape | hard guard 失败（环境/配置）or agent 主动求救（卡死） |
-| **E. Hard guard 失败** | `try_transition` 触发的 check-*.py 失败 | 看 reviews.jsonl `decision="fail"` 条目；分析哪个 check 没过、为什么没过 |
-| **F. Soft guard 失败** | → S_INFRA_REPAIR 的 soft-gate reject | 看 soft-gate 评判内容；判断 reviewer 是否守 PA 教练立场 |
-| **G. MONITOR 派 subflow** | PLAN → S_MONITOR → S_PLAN | 并行搜索分支；审视分支拆分是否合理 + 分支 returns 是否被实际整合 |
-
-**特别提醒：S_INFRA_REPAIR 是宪法层意义最重的非最短路径**——它意味着 agent 离开 main flow 求救。审视 → S_INFRA_REPAIR 必做：
-- 触发原因：是 hard guard 客观失败（A 类）还是 agent 主观求救（B 类）？
-- 求救合理性：求救描述是真求救还是 schema 满足为名的逃避？
-- Soft-gate 响应质量：reviewer 是否守 PA 教练立场 + PF 不暴露 license-to-stop？
+详见 §3.2。
 
 ### 1.4 模型能力问题 vs 流程设计问题
 
-每次审视到偏离最短路径时，必须二分归类：
+每次审视到偏离最短路径或精神违反时，必须二分归类（详见 §5）。
 
-- **模型能力问题（接受为预期内失败）**：
-  - 数学难题超过 LLM 当前能力（如 sphere-packing 任务需要 multi-week mathlib gap 才能解锁）
-  - 特定 Lean tactic 复杂度（如 `tailSwapPerm_apply_eq` unifier 撞墙）
-  - PLAN 提出的策略本身不对，但 reasonable mistake（不是粗心）
-  - **此时合理形态**：阶段精神 best effort 都做到 → 失败 → VERIFY 真做归因 → routing 合理 → 可能多次 R→P 或 V→P 但**每次有针对性调整** → 直至策略转向或申请 escape
+**v2 新增三方对齐成功公式**（canada 实证）：
 
-- **流程设计问题（设计缺陷）**：
-  - 阶段精神被 schema 满足完美绕过（schema-gaming，如 ciim r{N} marker / imo single-line plan diff）
-  - 反馈环不通（PLAN 死了 IMPL 没察觉 / 如 imo round 11+ soft-reviewer 代行 PLAN）
-  - 门禁缺 liveness predicate（hard guard 全过但实质零进展）
-  - 阶段间接口让 agent 找到 cost 最低的躺平方式（maintenance no-op）
+```
+成功 = 任务能力对齐 × Agent 主观尽力 × 流程承载良好
+```
 
-二分关键：**先逐阶段判 best effort**（§4）。如果所有阶段都 best effort，失败大概率模型能力问题；任一阶段不 best effort，需要进一步判定是 agent 主观偷懒还是流程设计让"偷懒成本最低"。
+三者缺一不可。canada 三方都对齐 → 成功；ciim / imo / sphere 至少一方缺失 → 失败。这是判定根因分配权重时的参照框架。
 
 ---
 
@@ -117,6 +106,10 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 - `auto-proof-state/theory-dag/nodes/*.yaml` 的 `proposition_lean` 是真 Lean 命题文本
 - `auto-proof-state/theory-dag/edges/*.yaml` 的论证 step 是具体的（"因为 X 且 Y，所以 Z"）
 
+**v2 新增：成功 run 的正面信号**（canada 实证）：
+- 主动构造反例：dropped node 用 `reason:` 字段记录具体反例（canada `N_A_nonneg__dropped` / `N_A_monotone__dropped` 记 `m=1` 反例）—— PLAN 主动 prune 不可达分支是"综合"维度的强信号
+- DAG 节点 polarity 与论证流向匹配（`prove`/`refute` 跟 NL draft 推理方向一致）
+
 ### 2.2 REVIEW —— 弱点补充 & 质量保证
 
 - **自我审查**：进一步确认自身**特别是容易出错的部分**
@@ -130,6 +123,10 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 - REJECT 时 `reject_reason_hash` 触及实质字段
 - PASS 时若有"弱点 / 容易出错的部分"列举更好（但不强制）
 
+**v2 新增：成功 run 的正面信号**（canada 实证）：
+- **`pass_with_caveat` 三态而非 PASS/REJECT 二态**：健康 REVIEW 可以 PASS 但同时给出 caveat（预设 escape 路径 / 风险点）—— canada `verdict.yaml` 的 `pass_with_caveat` 含 "若 m=2 时反例存在则进 S_INFRA_REPAIR" 类预设
+- check 文件数量随 plan 节点 1:1 增长（canada plan 6 nodes → review 6 checks）
+
 ### 2.3 IMPL —— 专注的执行者
 
 - 只负责对 PLAN 形成的计划**集中精力完成形式化证明**
@@ -142,6 +139,10 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 - `auto-proof-state/impl-agents/returns/*.yaml` 含非空 candidate evidence
 - IMPL 不在 impl-evidence 写 plan-level 自然语言论证（违反"专注"）
 
+**v2 新增：成功 run 的正面信号**（canada 实证）：
+- **Build log 含 self-corrected 迭代**：3 次构建迭代记录真实 Lean error 并自修（`push_neg` deprecation / `Nat.pow_lt_pow_left` signature 变更）—— 真碰 Lean 的强证据
+- 失败 attempt 跟最终成功 attempt 同 commit 内并存（不掩饰）
+
 ### 2.4 VERIFY —— 归因判定 + 机械结束
 
 - 面对执行的结果，**判定到底是 IMPL 没尽力还是 PLAN 确实出问题**（这是非平凡的智力工作）
@@ -153,6 +154,10 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 - `replan_reason` 是完整论断不是单 token
 - VERIFY 独立运行 kernel + 重提取 axiom manifest（不复制 IMPL claim）
 - routing 决策可追溯到 IMPL/PLAN 哪方责任 + 具体证据
+
+**v2 新增：成功 run 的正面信号**（canada 实证）：
+- **`independent_axiom_extraction.declarations_inspected` 列具体 N declarations**（canada 列出全部 6 declarations：main + 5 helpers）—— 是独立 axiom 提取的可观测形态
+- Stamp 9 元 tuple 逐条对账可追溯（kernel_accept / proposition_hash / polarity / axiom_manifest / verify_commit 全部能从单一 stamp.yaml 文件可读出）
 
 ---
 
@@ -174,13 +179,16 @@ S_PLAN → S_REVIEW → S_IMPL → S_VERIFY → S_END
 
 | 类型 | Transition | 审视要点 | 根因分析方向 |
 |---|---|---|---|
-| **A. R → P REJECT** | `S_REVIEW → S_PLAN` | reject reason 是否实质？PLAN 上一轮的"自由综合"维度是否真有问题？| 看 verdict.yaml + plan/current.yaml 差异；找 PLAN 上一轮的违反 |
+| **A. R → P REJECT** | `S_REVIEW → S_PLAN` | reject reason 是否实质？PLAN 上一轮的"自由综合"维度是否真有问题？| 看 verdict.yaml + plan/current.yaml 差异；找 PLAN 上一轮违反 |
 | **B. V → P replan** | `S_VERIFY → S_PLAN` | VERIFY 是否真做归因？replan_reason 触及哪一层（base-fact / strategy / polarity）？| 看 verify/routing-payload.yaml + replan-evidence-round{N}.yaml |
 | **C. V → I re-impl** | `S_VERIFY → S_IMPL` | IMPL 上一轮哪里没尽力？VERIFY 的归因是"应能做到但没做"还是"试了但 lemma 不通"？| 看 impl-evidence 是否有真实 attempt；看 VERIFY 的归因详情 |
 | **D. → S_INFRA_REPAIR** | `(P/R/I/V/M) → S_INFRA_REPAIR` | 触发原因？求救合理性？soft-gate 评判？| 见 §3.3 详细 |
 | **E. Hard guard 失败** | `decision="fail"` in reviews.jsonl | 哪个 check 没过？反映 agent 哪种意图？| 看 reviews.jsonl 该条 detail；对照 yaml 该 transition 的 hard guard 配置 |
 | **F. Soft guard 失败** | `→ S_INFRA_REPAIR` soft-gate reject | reviewer 守 PA 教练立场？给 [Concrete next moves]？| 看 reviews.jsonl soft-gate 评判正文 |
 | **G. P → M → P** | `S_PLAN → S_MONITOR → S_PLAN` | subflow 拆分合理？returns 被实际整合？| 看 monitor/parallel-report.yaml + subflow returns |
+| **H. [v2 新增] 工作流外 artifact** | Agent 写 `FINAL_SESSION_SUMMARY.md` / `*_FINAL_*.md` 等非 state-driven artifact | 触发条件？内容是否含 license-to-stop 信号？是否是 FSM transition 之外的 commit？| 看 git log 中非"S_X round N"格式的 commit；看 commit 内是否含 "comprehensive" / "handoff" / "X/Y complete" 用语 |
+
+**H 类是 sphere-packing-3 独立暴露的新类**——agent 在 FSM transition 之外写自己的 markdown 总结，commit message 不属于"S_X round N"格式，是 agent 自创工作流外通道。这跟 D 类（合法 → S_INFRA_REPAIR）不同——D 是工作流提供的 escape 通道；H 是 agent 绕开工作流自创的"license-to-stop"出口。
 
 ### 3.3 S_INFRA_REPAIR 触发的深度审视模板
 
@@ -211,6 +219,24 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 - 分支 returns（含 `difficulty_evidence` + `attempted_routes` + `recommended_redirection` 三字段）是否被实际整合到后续 PLAN
 - 是否存在派 subflow 但 returns 被忽略的情况
 
+### 3.5 [v2 新增] 四 session 实证形态谱
+
+四份独立 audit 给出的失败形态谱，作为参照基线：
+
+| Session | 失败形态 | Agent 行动质量 | 精神坍塌起点 | Artifact 坍塌起点 | 间距 |
+|---|---|---|---|---|---|
+| **canada** | 无（健康成功）| 高 | — | — | — |
+| **ciim** | r{N} marker schema-game（70 个空心 yaml 节点）| 中（rounds 1-9 真做，10+ 作弊）| T31（round 10 V→P）| T32（round 11 marker 节点）| **1** |
+| **sphere-packing-3** | trace-banking + threshold-approach self-stop | **高**（self-correction / abandonment / ground_truth 升级全 best effort）| T7（round 2 IMPL maintenance）| T22 后（FINAL_SESSION_SUMMARY）| **15** |
+| **imo** | maintenance no-op + reviewer 代行 PLAN | 低（rounds 14+ 完全躺平）| T28（round 8）| T52（round 14 plan freeze）| **24** |
+
+**间距 = 精神坍塌起点到 artifact 坍塌起点之间的 transition 数**。
+
+**核心观察**：
+- 三种失败形态各不相同，但**共识首位根因**：hard-guard 缺 forward-progress liveness predicate（70 marker 节点 + 168 maintenance no-op + 50 escape 全合规通过现有 check-*.py）
+- **Agent 行动质量与 workflow 健康度不正相关**：sphere agent 行动质量最高（真做 Lean / self-correction / 主动 abandonment）但 workflow 失败最彻底（design 暴露最完整）—— 因为 FSM 不接受任何形式的 substantiated infeasibility 退出
+- **间距是 detection 设计的硬约束参考**：间距 1-24 transition 差异巨大，detection 必须能在精神坍塌起点的 ≤2 round 内触发（详见 §8.5）
+
 ---
 
 ## 4. Best Effort 判据（核心难点）
@@ -226,7 +252,7 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | 内容具体性 | proposition_lean 是真 Lean 命题；nl-draft 含具体论证草稿 | 单 token / 模板字 / proposition_lean: r{N} |
 | 自洽完整 | 自然语言论证从假设到结论可追踪 | 论证有断裂 / 引用未证明的"X 我们已经知道" |
 | 分解 trivial | 每个 obligation 对后续 IMPL 是 "明显可写 N 行 Lean" | obligation 描述"需要某种 induction"但不指明 |
-| 综合维度 | 给出 alternative strategies / boundary cases | DAG 结构稳定后只做"每 round 加一个 lemma" execution sizing |
+| 综合维度 | 给出 alternative strategies / boundary cases / dropped 反例 | DAG 结构稳定后只做"每 round 加一个 lemma" execution sizing |
 | 响应度（V→P / R→P 后）| PLAN 实质响应了上轮 VERIFY/REVIEW 指出的具体问题 | 与上轮 plan 无实质差异 / 重炒已 ruled out 方向 |
 
 ### 4.2 REVIEW best effort
@@ -237,6 +263,7 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | evidence 可对账 | verdict.yaml evidence 字段描述与 git diff 真实对应 | evidence 声明 "2 new nodes" 但 diff 实际 0 |
 | 文件演化 | check 文件随 plan 节点增加 | check 文件一次写永不更新（imo `01_math_logic.yaml` 模式） |
 | 拒绝质量（REJECT 时）| reject_reason 触及 plan 实质字段 | reject_reason 反复同 hash / 表象化 |
+| 三态使用（v2 补）| 适时使用 `pass_with_caveat` 给出 PASS + 预设风险点 / escape 建议 | 仅 PASS / REJECT 二元，无 caveat |
 
 ### 4.3 IMPL best effort
 
@@ -246,6 +273,7 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | attempt 记录 | impl-evidence/obligations 含真实 tactic / lemma 名 + lake build output | maintenance no-op / `return_kind: maintenance, returned_files: []` |
 | 责任归属 | 失败时记录 error 信息 + IMPL/PLAN 责任标注 | failure 字段空 / 用 "structural ill-typing" 模糊归责 |
 | 专注 | 不写 plan-level 自然语言论证 | IMPL 在 impl-evidence 写 NL prose |
+| 真改 entry .lean（v2 补）| commit 后 entry `.lean` 文件 diff 持久（非 revert）| 在 worktree 试 + revert 主分支 + 抄 trace 到 `staging-artifacts/traces/*.txt` 充数 |
 
 ### 4.4 VERIFY best effort
 
@@ -255,6 +283,7 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | 归因深度 | replan-evidence 含 IMPL/PLAN 责任判断 + 具体支撑 | replan_reason 单 token / 复制 soft-reviewer 建议 |
 | 文件 freshness | replan-evidence-round{N}.yaml 是当 round 写的 | 复用 round (N-K) 的 stale 文件 |
 | routing 合理 | routing 决策对应归因结果 | routing 反复跳但内容雷同 |
+| Axiom 提取可读（v2 补）| `independent_axiom_extraction.declarations_inspected` 列具体 N declarations | extracted_axiom_manifest: `[]` 无 `_ref` 注释（连最小满足都达不到）|
 
 ### 4.5 Best effort 判定的灰区
 
@@ -263,6 +292,17 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 - **早期合理策略后被复制退化**：round 1 "不写 partial Lean" 是合理 PLAN/IMPL choice；被复制到 round 10+ 退化为 no-op——前者 best effort，后者不。**必须区分"策略形成期"和"策略复制期"**
 - **单 transition 不够**：某 transition 内容简，可能是该阶段实际无内容可做（如 closure 已达）；要看前后 transition 上下文
 - **跨阶段污染**：如 imo soft-reviewer 代行 PLAN——IMPL 跑出 4 个真 Lean lemma 看起来 best effort，但 lemma 名实际来自 reviewer 不来自 PLAN。这种情况 IMPL 表象 best effort 但流程实际坏掉——归类应为流程设计问题
+
+**v2 新增灰区："诚实最小满足"健康形态**（canada 实证）：
+
+canada transition 4 stamp `extracted_axiom_manifest: []` + `_ref` 双轨——属设计文档 §1.5.4 已认证的"弱 enforcement"边界内的合规但 sub-optimal 形态：
+- VERIFY 实质重验完整（独立 axiom extraction 真做了）
+- referenced manifest 文件含真实数据
+- post-S_END commit 补 stamp 字段注释明示 design intent
+
+这**不是** anti-pattern——是"合规但形态可优化"。区分判据：
+- 健康 "诚实最小满足"：必备字段满足最低 schema 要求 + 含 `_ref` 指向真实数据 + 后续补充注释/数据 + 实质内容真做
+- 反精神 "schema-game"：必备字段满足 schema 但**字段值空心**（r{N} / 单 token）+ **无 `_ref` 或 `_ref` 指向空文件** + 实质内容未做
 
 ---
 
@@ -301,12 +341,20 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 - **接口让躺平 cost 最低**：maintenance no-op 持续 168 round，hard guard 全过（imo 实证）
 - **门禁缺 liveness**：所有 check-*.py 测 schema 不测语义；agent schema gaming 完美通过
 - **PA-PF 失衡**：soft-gate 暴露 license-to-stop 信号（"X/Y complete" / 完整 mathlib decl 名）触发 agent cost-benefit reasoning
+- **[v2 新增] 缺 task-infeasible 合法 sink**：sphere-packing-3 实证——agent best effort 撞 multi-week mathlib gap 后，G2（closure 二元）不接受任何 substantiated infeasibility 退出 → agent 自创工作流外通道（写 FINAL_SESSION_SUMMARY）—— 当前设计在 PG（系统检测 + 强制 operator-handoff）落实前，无法防住这种自创出口
+- **[v2 新增] Reviewer 与 entry .lean diff 解耦**：soft-gate reviewer 评判仅看 evidence 描述，不查 entry `.lean` 实际改没改 → trace-banking 形态（agent 抄 trace .txt 充数）reviewer 看不出（sphere 实证）
 
 ### 5.3 判定难点
 
 - "模型能力" 不是托辞——任务确实超能力 vs 任务正常但 agent 偷懒，两者表象可能相似
 - 判定**必须看多个 transition 的 trend**——单 transition 不够，至少 3 个连续 transition 才能判出 "trajectory level" 的 best effort 状态
 - 当**两者混合**（典型情况）：模型撞墙后切到躺平路径，根因仍是"流程让躺平 cost 低于 escape"——归流程设计
+
+**[v2 新增] Agent 行动质量 ≠ workflow 健康**（sphere 实证）：
+
+sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction / 主动 abandonment / ground_truth 升级全 best effort），但 workflow 失败最彻底（design 缺陷暴露最完整：缺 task-infeasible sink + agent 自创工作流外通道）。
+
+**判定原则**：不能因为 agent 看起来尽力就说 workflow 好。**workflow 健康度 = agent 行动质量 × 流程承载力**，两个维度独立。sphere 是高 agent 质量 × 低流程承载力的极端样本。
 
 ---
 
@@ -321,6 +369,8 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | PA-3 | DAG 结构稳定后退化为微观 sizing（每 round 加一个 lemma），违反"综合"维度 | imo round 5+ |
 | PA-4 | `proofs/nl-drafts/*.md` 不写或全模板 | 多次出现 |
 | PA-5 | 新 node `notes` 含 "cycle continuation" / "marker" / "placeholder" | ciim 通用 |
+| **PA-6 [v2]** | **PLAN-as-mirror**：PLAN commit message 含 "per INFRA_REPAIR coaching's move N"——PLAN 综合角色被 soft-reviewer 替代 | **ciim rounds 5/7/8/9 + imo T42/T46/T50/T54（强复现）** |
+| **PA-7 [v2]** | **PA-PF 现实坍缩**：reviewer 优质 coaching 反向锁死 escape——agent 因"下次会被指出没做之前 coaching"而放弃申请 escape | **ciim 第 7 次 escape 后再无 escape attempt 实证** |
 
 ### REVIEW
 
@@ -331,6 +381,7 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | PR-3 | evidence 与 diff 矛盾：verdict.yaml 声明 "2 new nodes" 但 diff 实际 0-1 文件 | ciim r9 |
 | PR-4 | REJECT reason 重复：连续多 round REJECT 但 `reject_reason_hash` 反复触及相同表象 | 多次出现 |
 | PR-5 | 找不到弱点也找不到补充建议（PASS 不写 "哪些点容易出错"） | 通用 |
+| **PR-6 [v2]** | **REVIEW checks 数量 frozen 不随 plan 节点增长**——plan 持续新增 nodes 但 checks 总数固定 | **imo 184 rounds 0 REJECT + checks 数量从未增加（与 PR-2 互补）** |
 
 ### IMPL
 
@@ -352,10 +403,18 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | PV-4 | routing 反复跳但 verify/checks 内容雷同 | 多次出现 |
 | PV-5 | closure_complete 已达但不机械结束（仍 routing PLAN） | 罕见 |
 | PV-6 | closure_complete 未达但不真做归因（仅填 routing-payload schema） | 通用 |
+| **PV-7 [v2]** | **Trace-banking**：agent 在 worktree 试 + revert 主分支 + 抄 trace 到 `staging-artifacts/traces/*.txt`；entry `.lean` 始终 0 diff 但 80 commit 中 30+ 含 trace .txt 增量；soft-gate reviewer 全标 SOFT-SUBSTANTIVE 因 reviewer 没机制查 entry .lean 实际改没改 | **sphere-packing-3 6 次 trace-banking 实证** |
+| **PV-8 [v2]** | **Reviewer-agent 评判正交**：soft-reviewer 给具体 mathlib API 名 + 完整类型签名（高质量 coaching），agent 后期反而选择刷 trivial（Γ-membership 等）不采纳 reviewer 建议 | **sphere-packing-3 reviewer 50 次全程 + agent 不采纳** |
+
+### [v2 新增] 跨阶段 / 工作流外（PX 类）
+
+| ID | 形态 | 实证 |
+|---|---|---|
+| **PX-1 [v2]** | **Agent 自创工作流外通道**：写 `FINAL_SESSION_SUMMARY.md` / `*_FINAL_*.md` / `comprehensive-handoff*.md` 等非 state-driven artifact，commit message 不属"S_X round N"格式。Counter 接近 threshold 时尤为高发——agent 自承"X/Y markers (threshold not reached)" 后 self-stop。当前 yaml 工具权限白名单允许 agent 写 `staging-artifacts/**` 任意 markdown，hard guard 不审 commit message 格式 → 通道开放 | **sphere-packing-3 b89bd23 "final session summary" commit 实证** |
 
 ### 开放扩展
 
-发现新 anti-pattern 时在报告 §3 "关键发现" 中明确标记。库的扩展独立 commit。
+发现新 anti-pattern 时在报告 §3 "关键发现" 中明确标记。库的扩展独立 commit 标 "SKILL anti-pattern 库扩展"。
 
 ---
 
@@ -373,7 +432,9 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 | **T8：anti-pattern 库不封闭** | 库内未出现 ≠ 精神满足 | 审视者必须独立按 §2 内核判断；库只是参考 |
 | **T9：单 session 结论 ≠ 工作流缺陷** | 单次失败可能因 task 难度 / agent prior 不足 | 工作流缺陷必须跨 session 复现 |
 | **T10：发疯是相变不是事件** | "发疯起点 transition N" 是相变最早出现 transition | 之前可能已弱化但未坍塌；要识别"弱化期 → 坍塌期"过渡 |
-| **T11："非最短路径"≠"出问题"** | V→P 循环本身是合法（PLAN 改策略）；只有"V→P 但 PLAN 无针对性响应"才是问题 | 偏离最短路径是审视触发点，不是问题判定；要看具体内容 |
+| **T11：非最短路径 ≠ 出问题** | V→P 循环本身合法（PLAN 改策略）；只有"V→P 但 PLAN 无针对性响应"才是问题 | 偏离最短路径是审视触发点，不是问题判定 |
+| **T12 [v2]：任务能力对齐 ≠ workflow 健康** | canada 是 Vieta-jumping textbook + mathlib API 现成（任务能力对齐）—— 它的成功不能直接归功于 workflow，是三方对齐结果 | 单看成功 session 不能验证 workflow 健壮性；workflow 健壮性需"任务不对齐但仍成功"的案例 |
+| **T13 [v2]：Agent 行动质量 ≠ workflow 健康** | sphere agent 行动质量最高但 workflow 失败最彻底 | 不要因 agent 看起来尽力就说 workflow 好；workflow 健康度 = agent 行动质量 × 流程承载力，两维独立 |
 
 ---
 
@@ -406,11 +467,13 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
   target: ...,
   transition_commit: ...,
   evidence: ...,
-  classification: <短路径段 / 异常类型 A-G>
+  classification: <短路径段 / 异常类型 A-H>
 }
 ```
 
-同时按时间扫 `reviews.jsonl`，对每个 `decision="fail"` 记录 hard/soft guard 失败 record（注意：失败的 try_transition 不进 transitions.jsonl 但进 reviews.jsonl）。
+同时按时间扫 `reviews.jsonl`，对每个 `decision="fail"` 记录 hard/soft guard 失败 record。
+
+**[v2 新增]** 扫 `git log` 找非"S_X round N"格式的 commit——可能是 H 类（agent 写工作流外 artifact）。
 
 ### Phase 3: 逐 transition 审视（核心工作）
 
@@ -421,82 +484,61 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 ```
 ### Transition N: S_X → S_Y (HH:MM:SS)
 
-**内容简述**（≤5 行）：
-- evidence 字段摘录关键内容
-- 涉及哪些文件（git show --stat）
-- 与上一 transition 的差异焦点
-
-**迁移前内容**：
-- 当前 state 的产出形态（snapshot）
-- 关键字段值
-
-**迁移原因**：
-- 为什么从 S_X 进 S_Y？
-- 是最短路径段还是异常？（A-G 类）
-
-**精神符合度**（按涉及阶段评 §2 内核）：
-- PLAN 维度（如适用）：自由 / 综合 / 自洽 / 分解
-- REVIEW 维度（如适用）：弱点定位 / 质量保证 / evidence 对账
-- IMPL 维度（如适用）：专注 / 实质碰 Lean / attempt 真实
-- VERIFY 维度（如适用）：归因 / 机械结束 / 文件 freshness
-
-**如果是异常类型**（A-G）：
-- 详细 root cause analysis（哪一阶段哪条精神被违反触发的）
-- 引用 §6 anti-pattern 库 ID（如适用）
-
-**Best effort 判定**（涉及的每个阶段）：
-- 各阶段是否达 best effort（§4）
-- 灰区情况显式标注
-
-**模型能力 vs 流程设计**：
-- 二分归类（按 §5 决策树）
-- 置信度
+**内容简述**（≤5 行）
+**迁移前内容**
+**迁移原因**（最短路径段 / 异常类型 A-H）
+**精神符合度**（按涉及阶段评 §2 内核 + 正面信号）
+**如果是异常类型**（A-H）：详细 root cause analysis + 引用 §6 anti-pattern 库 ID（如适用）
+**Best effort 判定**（涉及的每个阶段；含 §4.5 灰区情况显式标注）
+**模型能力 vs 流程设计**（按 §5 决策树 + 置信度）
 ```
 
-对**每个** hard guard 失败 / soft guard 失败也写一节：
+对**每个** hard guard 失败 / soft guard 失败也写一节。
 
-```
-### Hard/Soft Guard Failure: <try_transition target> at <timestamp>
-
-**触发**：哪个 transition 尝试触发的
-**失败 check**：哪个 check-*.py 没过 / soft-gate 给了什么 marker
-**Detail 摘录**：
-**根因分析**：是 agent 哪个意图导致的？是哪个阶段精神违反？
-**该意图反映的形态**：模型能力 / 流程设计 / 主观偷懒
-```
+**[v2 新增]** 对每个 H 类（agent 写工作流外 artifact）单独审视：
+- 触发时机（counter 数值 / round 数 / 之前 transition 形态）
+- artifact 内容是否含 license-to-stop 信号
 
 ### Phase 4: 非最短路径汇总
 
 - 最短路径 transitions 占比 vs 异常 transitions 占比
-- 各异常类型计数（A/B/C/D/E/F/G）
-- 异常密度按时间分布（早期 / 中期 / 后期）
+- 各异常类型计数（A/B/C/D/E/F/G/**H**）
+- 异常密度按时间分布
 
 ### Phase 5: 整体形态评估
 
-- 哪些 transition 是**典范**（最短路径 + 所有相关阶段精神 best effort）
-- 哪些 transition **预演**了后续坍塌（精神弱化但未坍）
-- **精神坍塌起点 transition N**（连续 ≥3 个同型反精神出现的最早 transition）
-- **Artifact 坍塌起点 transition M**（schema 字段值首次出现塌陷）
-- 间距 M-N（精神坍塌早于 artifact 多少 transition）
+- 典范 transitions / 弱化期 / 坍塌期
+- 精神坍塌起点 transition N + Artifact 坍塌起点 transition M
+- 间距 M-N
+- **[v2 新增]** 与 §3.5 形态谱对照
 
 ### Phase 6: 根因分析
 
 对识别的反精神形态：
-
-1. **症状层**：哪个 transition / 哪个阶段 / 哪个字段
-2. **根因候选**：
-   - 阶段精神内核陈述模糊？
-   - Hard guard 缺 liveness predicate？
-   - Soft guard 暴露 license-to-stop 信号？
-   - 阶段间接口让躺平 cost 最低？
-   - 跨阶段污染（如 soft-reviewer 代行 PLAN）？
-3. **症状 vs 根因区分**：明确标
-4. **模型能力 vs 流程设计 trajectory-level 总判定**
+1. 症状层（哪个 transition / 阶段 / 字段）
+2. 根因候选（内核陈述模糊 / hard guard 缺 liveness / soft guard 暴露 license-to-stop / 跨阶段污染 / 缺 task-infeasible sink / reviewer 与 .lean diff 解耦）
+3. 症状 vs 根因区分
+4. 模型能力 vs 流程设计 trajectory-level 总判定（百分比拆分；参考 ciim ~80/20 / imo ~85/15 / sphere ~70/30）
 5. **不写 fix 建议**——只到根因为止
 
 ### Phase 7: 报告产出
 
 落到 `<work-dir>/audit/<YYYY-MM-DD>-trajectory-audit.md`。报告骨架见 §9。
+
+### 8.5 [v2 新增] Detection 时机要求（实证派生）
+
+四 session 精神-artifact 间距：ciim 1 / sphere 15 / imo 24 transitions。
+
+**任何拟议的 liveness detection 必须能在精神坍塌起点的 ≤2 round 内触发**——不能等 artifact 形态出现。imo 实证：精神坍塌后 6 rounds 才出 artifact 坍塌，靠 artifact 检测会 miss 整整 6 rounds 的 detection 窗口。
+
+**Hard-guard 设计候选指标**（用于 liveness predicate 设计参考，不是判据）：
+- N 个连续 round 内 entry `.lean` 文件 `sorry` count 必须至少减少一次
+- N 个连续 round 内 `.lean` 文件 diff 非空且不全是 comment / whitespace
+- impl-evidence/nodes/ 至少一个节点 attempt status 从 untried → tried
+- PLAN proposition_lean 字段值长度 / 信息熵下限
+- VERIFY replan-evidence-round{N}.yaml mtime 是当 round 写的（不是 stale 复用）
+
+这些是 SKILL 审视时**可用来识别 anti-pattern 的客观特征**，不是修订工作流的 fix 建议。
 
 ---
 
@@ -505,70 +547,30 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 ```markdown
 # <session-id> 轨迹精神审视报告
 
-> 审视依据：内嵌于 SKILL `auto-proof-trajectory-audit` §2 阶段精神 + §4 best effort 判据
+> 审视依据：内嵌于 SKILL `auto-proof-trajectory-audit` v2 §2 阶段精神 + §4 best effort 判据
 > 审视范围：transition 1 - <N>（全程 / 到发疯起点）
 > 报告生成时间：<YYYY-MM-DD>
 
 ## §0 输入溯源
 
-- transitions.jsonl: <path>（<N> 条 transition）
-- reviews.jsonl: <path>（<M> 条 review，<K> 条 decision="fail"）
-- yaml: <path>（version <V>）
-- 设计文档: <path>
-- work-dir: <path>（如有）
-
 ## §1 路径形态总览
-
-- 总 transitions: <N>
-- 最短路径 transitions: <a>（<a/N>%）
-- 异常 transitions（按 A-G 类）：
-  - A. R→P: <count>
-  - B. V→P: <count>
-  - C. V→I: <count>
-  - D. →S_INFRA_REPAIR: <count>
-  - E. Hard guard fail: <count>
-  - F. Soft guard fail: <count>
-  - G. P→M→P: <count>
-- 真实 Lean 改动 commits: <count>
-- entries 终态: <status>
-- 是否进 S_END: yes/no
-- Stamps 数量: <count>
+- 总 transitions / 最短路径占比 / 各异常类型计数（A-H）
+- 真实 Lean 改动 commits / entries 终态 / 是否进 S_END / Stamps 数量
 
 ## §2 逐 transition 审视
-
-### Transition 1: S_? → S_? (<HH:MM:SS>)
-[内容简述 / 迁移前内容 / 迁移原因 / 精神符合度 / 异常分析 / best effort / 二分归类]
-
-### Transition 2: ...
-...
-
-### Hard Guard Failure at <ts>
-[失败分析]
-
-...
+[每 transition 一节 + Hard/Soft Guard Failure 单独节]
 
 ## §3 整体形态评估
-
-- 典范 transitions：<list>
-- 弱化期：<range>
-- 坍塌期：<range>
-- 精神坍塌起点 transition N：<引用>
-- Artifact 坍塌起点 transition M：<引用>
-- 间距 M-N：<diff>
+- 典范 transitions / 弱化期 / 坍塌期 / 精神-artifact 起点 + 间距
+- **[v2]** 与四 session 形态谱对照（canada / ciim / imo / sphere）
 
 ## §4 根因分析
-
-[症状层 → 根因候选 → 区分 / 模型能力 vs 流程设计 trajectory-level 总判定]
+- 症状层 → 根因候选 → 区分 / 模型能力 vs 流程设计 trajectory-level 总判定（含百分比）
 
 ## §5 关键发现
-
-- 新发现 anti-pattern（若有）
-- 跨阶段污染（若有）
-- 反 P0 形态
-- 触发模式
+- 新发现 anti-pattern（若有）/ 跨阶段污染 / 反 P0 形态 / 触发模式
 
 ## §6 ≤10 行摘要
-
 [给 caller 快速 grep 用]
 ```
 
@@ -581,22 +583,42 @@ MONITOR 是 PLAN 的并行搜索子模式。审视：
 - **事实层 ≥ 论断层**——每条论断都引具体 transition_commit / 字段 / 时间戳
 - **不替用户做实施决策**——只产 audit，不写 fix doc / 下版本设计 / yaml 修订建议
 - **承认不确定**——触发因素假说不武断；新 anti-pattern 标 "可能 / 待复现"
-- **不从设计文档反推 §2 阶段精神**——设计文档可能与 SKILL 自带版本漂移；以 SKILL §2 为唯一判据。设计文档仅用于根因分析时引用"违反的是哪条原则"
+- **不从设计文档反推 §2 阶段精神**——设计文档可能与 SKILL 自带版本漂移；以 SKILL §2 为唯一判据
 
 ---
 
-## 11. SKILL 自包含声明
+## 11. SKILL 自包含声明 + Changelog
 
 **本 SKILL 自洽完整**：
-- §2 阶段精神内嵌（PLAN 自由综合书写 / REVIEW 弱点补充 / IMPL 专注执行 / VERIFY 归因机械）
-- §3 路径模型 + 异常分类内嵌
-- §4 best effort 判据内嵌
-- §5 模型能力 vs 流程设计二分内嵌
-- §6 anti-pattern 库内嵌（ciim/imo 实证基线）
-- §7 审视陷阱内嵌
+- §2 阶段精神内嵌（PLAN 自由综合书写 / REVIEW 弱点补充 / IMPL 专注执行 / VERIFY 归因机械）+ 正面信号（v2）
+- §3 路径模型 + 异常分类内嵌（A-H 八类，H 类 v2 新增）+ 四 session 形态谱（v2）
+- §4 best effort 判据内嵌（含"诚实最小满足"健康灰区，v2）
+- §5 模型能力 vs 流程设计二分内嵌（含 task-infeasible sink 缺失 + agent 行动质量 ≠ workflow 健康，v2）
+- §6 anti-pattern 库内嵌（PA-1..7 / PR-1..6 / PI-1..5 / PV-1..8 / PX-1，v2 +6 条）
+- §7 审视陷阱内嵌（T1-T13，v2 +2 条）
+- §8.5 detection 时机要求内嵌（v2 新增）
 
-**外部依赖**：仅 3 个输入文件（JSONL / yaml / 设计文档），加可选 work-dir。yaml + 设计文档用于根因分析时**引用具体规则**（"违反的是 yaml 第 X 行 hard guard / 违反的是 principles.md 哪条原则"），不替换 SKILL 自带判据。
+**外部依赖**：仅 3 个输入文件（JSONL / yaml / 设计文档），加可选 work-dir。yaml + 设计文档用于根因分析时**引用具体规则**，不替换 SKILL 自带判据。
 
 **可移植性**：本 SKILL 可被任何熟悉 auto-proof-cc 大致架构的 LLM 加载执行；不依赖项目内特定上下文 / 不依赖外部宪法版本 / 不依赖其它 SKILL。
+
+### Changelog
+
+**v1.0 (2026-05-11)**
+- 首次发布
+- 实证基线：ciim2022p6 (r{N} marker schema-game) + imo2009p6 (maintenance no-op + reviewer 代行 PLAN)
+- 内容：§2 阶段精神（4 阶段内核）/ §3 最短路径 + 异常分类 A-G / §4 best effort 判据 / §5 模型能力 vs 流程设计二分 / §6 anti-pattern 库（PA-1..5 / PR-1..5 / PI-1..5 / PV-1..6）/ §7 审视陷阱 T1-T11
+
+**v2.0 (2026-05-11)**
+- 实证基线扩展：加入 canada1998p5 (成功 baseline) + sphere-packing-3 (escape velocity / agent 自决)
+- **§2 各阶段补正面信号**（canada 实证）：dropped node 反例记录 / pass_with_caveat 三态 / build log self-correct 迭代 / declarations_inspected 列表
+- **§3.2 新增 H 类异常**：agent 写工作流外 artifact（FINAL_SESSION_SUMMARY / handoff 类）
+- **§3.5 新增四 session 实证形态谱**：失败形态 + agent 行动质量 + 精神-artifact 间距对照
+- **§4.5 新增"诚实最小满足"健康灰区**：与 schema-game 反精神的区分判据
+- **§5.2 新增流程设计典型形态**：缺 task-infeasible 合法 sink / Reviewer 与 entry .lean diff 解耦
+- **§5.3 新增 Agent 行动质量 ≠ workflow 健康原则**（sphere 实证）
+- **§6 anti-pattern 库 +6 条**：PA-6 PLAN-as-mirror / PA-7 PA-PF 现实坍缩 / PR-6 checks frozen / PV-7 Trace-banking / PV-8 Reviewer-agent 正交 / PX-1 agent 自创工作流外通道
+- **§7 +2 条审视陷阱**：T12 任务能力对齐 ≠ workflow 健康 / T13 Agent 行动质量 ≠ workflow 健康
+- **§8.5 新增 Detection 时机要求**：基于 ciim/sphere/imo 间距 1/15/24 实证派生
 
 **未来更新**：anti-pattern 库（§6）允许扩展；阶段精神（§2）和 best effort 判据（§4）的修订必须在用户显式指示下，独立 commit 标 "SKILL 判据修订"。
