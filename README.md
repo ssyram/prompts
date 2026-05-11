@@ -20,6 +20,31 @@
 
 这三个 prompt 可以连起来用：先定规约，再做审计，再迭代修正。
 
+### 工作流系列
+
+- `workflow`: 通用开发工作流程规范——三阶段（调研 → 架构 → 细化）+ 实现 + 修复迭代 + 文档管理。面向新功能开发与 Bug 修复的标准流程，AI 助手的行为准则与禁令。
+- `principle-workflow`: `workflow` 的演进版——在三阶段之上叠加一层**§0 精神宪法**。糅合 `principle-derivation` 的"问题意识 → 派生原则 → 推导"骨架，把 `principles.md` 作为不可篡改的宪法，所有下游设计 / 代码 / 报告必须 100% 满足。
+- `workflow-audit`: 多方向、disprove-first 的 PR 审计工作流，并行 challenge 轮 + evidence-gated 结论。
+
+#### `workflow` 与 `principle-workflow` 的演进关系
+
+| 维度 | `workflow` | `principle-workflow` |
+|---|---|---|
+| 起点 | 调研阶段 | **§0 精神宪法**（先于调研） |
+| 顶层文档 | `architecture.md` | `principles.md`（宪法）→ `architecture.md`（受宪法约束） |
+| 决策溯源 | 每条决策有理由 | 每条决策必须**追溯到宪法的某条原则**，写入推导表 |
+| 设计修订 | 修订设计文档 | 区分修订层级（细化/架构/宪法）；宪法修订需用户显式拍板 |
+| AI 助手禁令 | 不擅自改测试用例、不跳过设计 | 额外：**禁止修改 `principles.md` 未经允许** |
+| 适用场景 | 一般功能开发 | 项目目标存在结构性张力、需要稳定承诺的根本意识 |
+
+**何时用哪个**：
+
+- 简单功能、CRUD、局部模块 → `workflow` 够用
+- 项目立项 / 需要长期稳定承诺 / 多人协作易漂移 / 已多次出现"为某次变更临时改架构"现象 → 用 `principle-workflow`，先把宪法立住
+- 已有 `workflow` 项目升级 → 反向 reverse-engineer 出 `principles.md`，迁移到 `principle-workflow`（详见 `principle-workflow.md` §0.4）
+
+`principle-workflow` 的核心增量：**以宪法换稳定性**——多一层约束，但下游的所有争议都能溯源到宪法层判定，避免讨论无限循环。
+
 ### 辅助 prompt
 
 - `finegrained-check`: 适合做更细粒度的检查或补充验证。
