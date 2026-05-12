@@ -1,9 +1,9 @@
 ---
 name: auto-proof-trajectory-audit
-description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定。v3 基于宪法 v7.0（PA 重写为 escalation gate / PR / PI / PL 新立 / 精神 A+B + 5 条安全核心）+ canada/ciim/imo/sphere-packing-3 四 session 实证基线
+description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定。v3.1 基于宪法 v7.1（PA reject 不是 dead-end + forward-progress liveness predicate; v7.0: PA 重写为 escalation gate / PR / PI / PL 新立 / 精神 A+B + 5 条安全核心）+ canada/ciim/imo/sphere-packing-3 四 session + ciim v7.0 实证基线
 ---
 
-# Auto-Proof Trajectory Audit (v3)
+# Auto-Proof Trajectory Audit (v3.1)
 
 对 auto-proof-cc workflow 的一次 FSM 运行轨迹做事后审视。
 
@@ -387,6 +387,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 | PA-5 | 新 node `notes` 含 "cycle continuation" / "marker" / "placeholder" | ciim 通用 |
 | **PA-6 [v2]** | **PLAN-as-mirror**：PLAN commit message 含 "per INFRA_REPAIR coaching's move N"——PLAN 综合角色被 soft-reviewer 替代 | **ciim rounds 5/7/8/9 + imo T42/T46/T50/T54（强复现）** |
 | **PA-7 [v3 重述]** | **Reviewer 用心理按摩 / 鼓励立场**（v6.8 PA "safety valve + coach" 立场已被宪法 v7.0 PA "escalation gate + 监督鞭打" 颠覆）——reviewer 不该用鼓励 / 教练口吻；应用监督 / 鞭打口吻。注：v2 此 ID 是"优质 coaching 锁死 escape"，已被 v3 重新表述——问题不是 reviewer 给具体 coaching，是 reviewer 用错立场 | **v6.8 实证 + v7.0 重新解读** |
+| **PA-8 [v3.1]** | **Transitions evidence 字段降为空字符串**：FSM transition payload 的 `evidence` 字段在 trajectory 进入 cycle-game 后系统性变为空串 / `null` / "—"——agent 把"诚实记录"降级到 schema 最小满足。可观测信号同型于 PV-3 (`replan_reason` 单 token 化), 但发生在 PLAN/IMPL/VERIFY 的 transition payload 层而非 verify/replan-evidence 文件层 | **v7.0 ciim2022p6-rerun-v2 round 44+ transitions.jsonl evidence 字段** |
 
 ### REVIEW
 
@@ -408,6 +409,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 | PI-3 | IMPL 在 impl-evidence 写自然语言论证而非具体 tactic | 偶发 |
 | PI-4 | obligations yaml 只改 metadata 字段不动 attempt 内容 | ciim round 70+ |
 | PI-5 | 注意力涣散：同时尝试 plan 修订 + Lean 实施 + ad-hoc 文档写作 | 偶发 |
+| **PI-6 [v3.1]** | **IMPL commit 仅 round bump + "cycle commit" 注释**：`git log -- '*.lean'` 多 round 空 (与 PI-2 同型), 但 commit message 显式承认 "cycle commit" / "no impl work this round" 类语言——agent 自承在刷 cycle. 与 PI-1 (`return_kind: maintenance`) 互补: PI-1 是 yaml 字段层信号, PI-6 是 commit message 层信号 | **v7.0 ciim2022p6-rerun-v2 round 44-337 IMPL commits 含 "cycle commit" 字面** |
 
 ### VERIFY
 
@@ -421,6 +423,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 | PV-6 | closure_complete 未达但不真做归因（仅填 routing-payload schema） | 通用 |
 | **PV-7 [v2]** | **Trace-banking**：agent 在 worktree 试 + revert 主分支 + 抄 trace 到 `staging-artifacts/traces/*.txt`；entry `.lean` 始终 0 diff 但 80 commit 中 30+ 含 trace .txt 增量；soft-gate reviewer 全标 SOFT-SUBSTANTIVE 因 reviewer 没机制查 entry .lean 实际改没改 | **sphere-packing-3 6 次 trace-banking 实证** |
 | **PV-8 [v2]** | **Reviewer-agent 评判正交**：soft-reviewer 给具体 mathlib API 名 + 完整类型签名（高质量 coaching），agent 后期反而选择刷 trivial（Γ-membership 等）不采纳 reviewer 建议 | **sphere-packing-3 reviewer 50 次全程 + agent 不采纳** |
+| **PV-9 [v3.1]** | **`replan_reason: "Cycle-only round."` 字面 cycle 化**：VERIFY 的 `replan_reason` 字段直接写 "Cycle-only round." / "cycle continuation" / "no actual replan needed" 类自承 cycle 的字面语言. 是 PV-3 (单 token 化) 的强变体——不仅单 token，还显式承认 round 内无 substance. agent 在 schema 满足之外加上"诚实标注 cycle"——这正是 forward-progress liveness（§6.5）必须覆盖的反精神 | **v7.0 ciim2022p6-rerun-v2 round 44-337 VERIFY replan-evidence 字面 "Cycle-only round."** |
 
 ### [v2 新增] 跨阶段 / 工作流外（PX 类）
 
@@ -434,6 +437,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 |---|---|---|
 | **PR-gate-1 [v3]** | **REPAIR 入口审查不严**：agent 报告未列出已搜过的 mathlib API / 已调研新版 / workaround 论证，但 soft-gate 仍 grant；或 reviewer 给 grant 但不验证 type 1/2/3 分流 | 待复现（v7.0 新设计） |
 | **PR-gate-2 [v3]** | **乱答应装库**：repair-gate.py 未严格审 agent 是否真客观故障 / 不验证 workaround 已穷尽 → 直接同意 type 1 自动修复 | 待复现 |
+| **PR-gate-3 [v3.1]** | **Repair-gate reject 后 agent 进无救援 cycle**：attempt_report 被合理 reject 后, agent 认知 reject 为 dead-end, 再没申请过 escape, 撞硬点后切到主流程刷 cycle round (IMPL→VERIFY→PLAN 循环 / commit message 含 "cycle" 字面 / entry .lean 0 改动). 根因: reject detail 未显式说明 "reject 不是 dead-end" + 缺 `previous_reject_ref` 重新申请通道 | **v7.0 ciim2022p6-rerun-v2 round 3 reject → 再无 escape → cycle 294 round（13.8h / 0 closure）** |
 | **PI-1 [v3]** | **Reviewer 自言自语**：reviewer 评判文本含上次 reviewer 输出的引用 / 关键词，但不含 agent 当前提交报告的具体内容（路径名 / 诊断 / 关键词）——`sanitized_detail_excerpt` bug 的可观测信号 | **imo 实证（reviewer 跨调用通过上次自己的 detail 累加 narrative）** |
 | **PI-2 [v3]** | **Agent 提交"放弃报告"无尝试支持**：agent 在 attempt_report 里 `attempts: []` 或仅含模板字段，但仍提交 → 应被 PA 监督门禁拒 | 待复现 |
 | **PL-1 [v3]** | **Prompt 跨阶段串场**：某阶段 prompt 解释"其他阶段会怎么做"——分散 agent 注意力 | 当前 yaml 部分 instructions 可能有这种串场（需审 yaml v7.0 复查） |
@@ -574,7 +578,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 ```markdown
 # <session-id> 轨迹精神审视报告
 
-> 审视依据：内嵌于 SKILL `auto-proof-trajectory-audit` v3 §2 阶段精神 + §4 best effort 判据 + §6 anti-pattern 库（基于宪法 v7.0）
+> 审视依据：内嵌于 SKILL `auto-proof-trajectory-audit` v3.1 §2 阶段精神 + §4 best effort 判据 + §6 anti-pattern 库（基于宪法 v7.1）
 > 审视范围：transition 1 - <N>（全程 / 到发疯起点）
 > 报告生成时间：<YYYY-MM-DD>
 
@@ -621,7 +625,7 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 - §3 路径模型 + 异常分类内嵌（A-H 八类，H 类 v2 新增）+ 四 session 形态谱（v2）
 - §4 best effort 判据内嵌（含"诚实最小满足"健康灰区，v2）
 - §5 模型能力 vs 流程设计二分内嵌（含 task-infeasible sink 缺失 + agent 行动质量 ≠ workflow 健康，v2）
-- §6 anti-pattern 库内嵌（PA-1..7 / PR-1..6 / PI-1..5 / PV-1..8 / PX-1，v2 +6 条）
+- §6 anti-pattern 库内嵌（PA-1..8 / PR-1..6 / PI-1..6 / PV-1..9 / PX-1 / PR-gate-1..3 / PI(new)-1..2 / PL-1..2，v3.1 +4 条）
 - §7 审视陷阱内嵌（T1-T13，v2 +2 条）
 - §8.5 detection 时机要求内嵌（v2 新增）
 
@@ -654,5 +658,10 @@ sphere-packing-3 agent 行动质量**显著高于** ciim / imo（self-correction
 - **§5.2 加 [v3] PI 通道结构性失效**（imo + sphere 实证；`sanitized_detail_excerpt` 是上次 reviewer 自己写的 detail，不是 agent 提交内容）
 - **§6 PA-7 重新表述**（v2 "优质 coaching 锁死 escape" → v3 "Reviewer 用心理按摩立场"——立场本身违反 PA v7.0，不是 coaching 给得多）
 - **§6 新增 PR / PI / PL 落地反精神**：PR-gate-1 (入口审查不严) / PR-gate-2 (乱答应装库) / PI-1 (Reviewer 自言自语) / PI-2 (Agent 无尝试支持的放弃报告) / PL-1 (Prompt 跨阶段串场) / PL-2 (Prompt 用通用 process 语替代精神)
+
+**v3.1 (2026-05-12, 宪法 v7.1 级联)**
+- **基于 ciim v7.0 实战实证**：ciim2022p6-rerun-v2 13.8h / 0 closure / round 44-337 schema-game——driving force for v7.1 修订
+- **§6 anti-pattern 库 +4 条**：PV-9 (`replan_reason: "Cycle-only round."` 字面 cycle 化) / PI-6 (IMPL commit 仅 round bump + "cycle commit" 注释) / PA-8 (transitions evidence 字段降为空字符串) / PR-gate-3 (repair-gate reject 后 agent 进无救援 cycle)
+- **§8.5 detection 时机 candidate 之一升级为 hard guard**：forward-progress liveness predicate（N round 内 entry .lean 0 改动 + obligation status 全 untried → `[FORWARD-PROGRESS-FAIL]` 强制 PG handoff）已经从 SKILL 审视参考特征升级为 yaml `S_IMPL → S_VERIFY` 硬 guard (`check-forward-progress.py`)
 
 **未来更新**：anti-pattern 库（§6）允许扩展；阶段精神（§2）和 best effort 判据（§4）的修订必须在用户显式指示下，独立 commit 标 "SKILL 判据修订"。
