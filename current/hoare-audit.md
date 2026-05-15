@@ -173,6 +173,25 @@ Split remaining reduced findings into two buckets:
 
 **Step 5 — Auto-fix Non-Decisional findings.** Automatically implement fixes for all Non-Decisional findings. No human permission needed. Apply minimal patches targeting root causes from Step 4.5. For non-trivial fixes, document root cause and fix rationale (what was wrong, why this fix, expected behavior after fix).
 
+**Step 5.5 — Property-based test codification (MANDATORY for code findings).**
+
+*Every confirmed code finding MUST be encoded as either a deterministic regression test OR a property-based test (PBT).* The audit's value decays unless the contract it verified survives in the test suite. A finding that was important enough to challenge twice is important enough to gate.
+
+For each confirmed code finding from Step 4.5:
+
+1. **Pick the form**:
+   - Boundary / single-input / display-shape findings → deterministic regression test (one or a small handful of cases).
+   - Universal invariants surfaced by the audit (idempotence, base-dir rebasing for relative paths, "absolute input passes through unchanged", round-trip schema preservation) → **PBT** (`proptest` / `quickcheck` / language-equivalent).
+   - Reachability findings (variant X reachable only under condition Y) → deterministic regression test that constructs condition Y.
+
+2. **Write the test**: place it next to the existing test module so a future regression flips it red.
+
+3. **Run the suite**: `cargo test` (or equivalent) and report green/red **faithfully**. A test plan that doesn't run is not protection.
+
+4. **Record in audit log**: `docs/audit/RoundN/pbt-additions.md` lists every finding → test mapping with file:line of the new test, so the next round can verify the codification was preserved.
+
+**Hard rule**: a Hoare-audit round is NOT complete until every confirmed code finding has a corresponding test that would fail if the finding regressed. Finding ID alone is insufficient — point to the test that pins it.
+
 **Step 6 — Verification sweep.** Launch an agent to verify each fix (PASS/FAIL per fix point). Write to `docs/audit/RoundN/verify.md`. Add regression tests where applicable. If any FAIL, go back to Step 5.
 
 **Step 7 — Convergence check.**
@@ -198,6 +217,7 @@ Write `docs/correctness-audit.md` containing:
 6. **Decisional Findings Log** — all decisional items, human decisions made, and rationale
 7. **Remaining Limitations** — anything that couldn't be fully proven (PARTIAL/UNVERIFIABLE)
 8. **Assumptions Registry** — every external dependency, for re-verification if APIs change
+9. **Test Codification Map** — every confirmed code finding → the test (deterministic regression or PBT) that pins it. If a finding has no pinning test, the round is incomplete.
 
 ## Rules
 
@@ -217,3 +237,4 @@ Write `docs/correctness-audit.md` containing:
 - **Disprove-first, not confirm-first**: The default stance toward any finding is skepticism. Findings must survive active disproval attempts before becoming actionable. An uncontested finding is weaker than a contested-and-surviving one.
 - **Evidence over assertion**: For code findings, "I believe this could happen" is not evidence. Show a concrete test case, PoC, or step-by-step trace that demonstrates the issue fires. For doc findings, show the exact text that is wrong AND confirm no other part of the document corrects or mitigates it.
 - **Disputed findings go to human**: If challengers and counter-challengers disagree, present both sides' evidence to the human. Do not resolve disputes by majority vote — present the arguments.
+- **Every code finding gets a pinning test**: a confirmed code finding without a deterministic regression or PBT in the suite is a half-finished audit. PBT is the default for universal invariants surfaced during the audit (idempotence, round-trip, base-dir rebasing). If the test runner is not green at the end of Step 5.5, the round is not complete.
