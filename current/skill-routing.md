@@ -68,6 +68,19 @@
 - **workflow-audit vs ultrareview**：都是 PR review，但 workflow-audit 是单 agent 做 multi-direction；ultrareview 是 multi-agent cloud parallel（user-triggered 计费）。ultrareview 不能由 Claude 自己调起
 - **hoare-audit vs trajectory-audit**（如 auto-proof-trajectory-audit）：前者审代码正确性 vs spec，后者审 agent 跑动轨迹是否符合设计精神。不同对象、不同输入
 
+### `/hoare-audit` 与 Lv0–Lv4 的关系
+
+参见 `prompts/meta-principles.md` 的层级定义。
+
+- `/hoare-audit` 工作在 **Lv3 ↔ Lv4**：design report 描述应该做什么，代码 / YAML 是否真的做到了
+- **Lv3（方案 / design report）= `/hoare-audit` 的硬底线 spec**；缺则先 `/hoare-design` 还原
+- **Lv1 / Lv2 不是 `/hoare-audit` 的输入**；它们是 Lv3 出现「方案本身可疑」时的**仲裁杠杆**。有则减少 Decisional 数量，无则不阻塞 audit（只是更多歧义被推到 Decisional gate）
+- **`/hoare-design` 只产 Lv3** descriptive spec，不产 Lv1 / Lv2
+- **立 Lv1 / Lv2 是 `/charter-craft` 的工作**，不是 `/hoare-audit` 的工作
+- 「函数级 Pre/Post/Invariant」是 Lv3 内部颗粒度选择，不是新的层级
+
+**误区警示**：曾把 Lv0–Lv3 误读为「意图 / 架构 / 接口 / 函数」四级文档粒度。这是错的。Lv 是制宪体系的推导层次，不是文档粒度。
+
 ---
 
 ## audit 类 skill 的共性："驳回优先 / 先反后反反"
