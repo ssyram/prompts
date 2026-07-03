@@ -1,39 +1,159 @@
-Use the `qpdi` skill.
+---
+name: qpdi
+description: QPDI 宪政式工作框架——以 /workflow 等 SDD skill 为骨架，从问题意识（Q）出发推进 设计（D）→ 实现（I）全流程：意图落宪、架构起草与原则抽离、细化、实现测试、公检法审查。自包含，不依赖任何外部仓库。
+---
 
-Treat the user material as QPDI organization input unless the user explicitly asks for implementation.
+# QPDI — 宪政式 AI 工作框架
 
-Task:
+任务材料：
 $ARGUMENTS
 
-Do this:
+本 skill 自包含。按下文执行即可，无须索引任何外部项目。（若当前工作目录本身就是 QPDI 体系本体项目 principled-ai，则以其 `docs/design/` 为权威定义源，本文让位。）
 
-1. Classify the material:
-   - `Q.I` — intent, pursuit, root purpose.
-   - `Q.A` — cognition premise, foundational belief, why this method works.
-   - `Q.E` — experience, repeated failure, concrete lesson.
-   - `architecture` — system structure or design commitment.
-   - `rules/conventions` — governance, exclusion force, file/template convention.
-   - `detail` — concrete state or workflow behavior.
-   - `audit` — tribunal trace or review evidence.
+---
 
-2. Point to the direct source file and line when known.
+## 一、体系：QPDI 是什么
 
-3. Check only nearby alignment:
-   - upstream support;
-   - downstream承接;
-   - obvious contradiction;
-   - stale duplication;
-   - active decision gate.
+QPDI 是一种**宪政式 AI 工作结构**：不允许 AI 从任务描述直接跳到产出物，而要求任何非平凡产出都能沿显式的论证链说明——它回答了什么意图、依据了哪些认知与经验、由什么设计承诺支撑。
 
-4. Answer in this format:
+三类内容类型及其论证约束：
+
+- **Q = 问题意识**（人的最小不可委托边界）
+  - `Q.I` 意图：在此问题中**追求什么、保护什么、不接受什么**（三段式）。缺 Q.I 的设计论证无效。
+  - `Q.A` 认知前提：作为推理前提使用的认知性命题（本身不陈述规范方向）。
+  - `Q.E` 经验材料：踩坑教训、反复观察。提供经验支撑，不提供规范方向。
+- **D = 设计**：`D.root` 直接回答 `Q.I`；各级设计节点带 reasoning（何以成立、为什么不能更简单）；非平凡设计选择明言化为**局部规则**（P），只 govern 其归属节点及子树。
+- **I = 实现**：代码、文件、脚本、配置。**I 的论证来源只能是 D**——不能跳过 D 直接拿 Q 为实现选择辩护。
+
+配套约束：
+
+- **Structural Locality**：每个断言只能从其结构位置允许的来源取论证材料（D 引用 Q 与祖先链规则；I 只引用 D）。
+- **SCCO**：Sound / Complete / Concise / Optimization 四维检查标准（详见 `/qpdi-tribunal`）。
+- **Discover**：推进中发现现有 Q/D 支撑不足时，回到**需要修订的最高层**补表达，再继续；禁止在 I 层就地 hack。
+- **委托边界**：AI 可以展开 P/D/I、生成候选 Q、暴露 Q.I 冲突、挑战 Q.A，但**不能拥有人的问题意识**——候选 Q 只有经人确认才成为 Q。
+
+## 二、目标：理想情况长什么样
+
+- **人只做三件事**：表达 Q、对既有 Q/规则推不出的事项裁决、对外发布前最终确认。其余调研、设计展开、实现、测试、审查、修复全由 agent 承担。
+- **产出是可继续维护的资产**：设计文档 + 审查留痕 + 代码三位一体，接手者能从两个文档根找全所有体系资产。
+- **每个非平凡产出可追溯**：`Q.I → D → I` 链条完整；关键判断有正反双向检验；agent 自述不算证据。
+- **审查收敛**：对外前通过公检法审查（0 阻断级问题），或明确报告不可收敛原因 + 决策项清单。
+- **失败可诊断**：出问题时能定位到是 Q.I 需澄清、Q.A 前提错、D 未回答 Q.I、还是 I 越过 D——而不是笼统的 "AI drift"。
+
+## 三、骨架：以 /workflow 等 SDD skill 为承载
+
+QPDI **不另起并列流程**。工程流程骨架直接采用 `/workflow`（调研 → 架构 → 细化 → 实现 → 测试 → 审核 → 修复，含规约模板、正确性论证格式、契约对照 v2）。QPDI 在这副骨架上叠加三件事：
+
+1. **Q 层先行**：动手前先把用户意图落成宪法（principles 文档），后续一切设计从它出发、向它追溯。
+2. **trace 纪律**：架构与细化文档中的非平凡选择标注其 Q/D 依据；实现只对细化设计负责。
+3. **公检法关卡**：架构后、细化后、对外前三个关口调 `/qpdi-tribunal` 做 SCCO 审查，问题分流为 agent 可修 / 须用户裁决。
+
+/workflow 各节该怎么写规约、怎么做论证、怎么修 bug，本 skill 不重复——直接遵循 /workflow。
+
+## 四、运行：操作规程
+
+> 原体系以 FSM 硬门禁 enforce 每步；skill 化后由你自律执行。各步的**完成判据不变**：有落盘 artifact / 真实命令输出 / 用户原文确认，自述"已完成"不算数（贯穿纪律 1）。
+
+### 第 0 步 · 启动定位
+
+1. **判定接手模式**（四选一，见 §六）：项目空白 → greenfield（不必问）；有东西 → 问用户"全量还是增量？"，全量且结构标准 → continue（再问从哪步起跑），结构非标准 → takeover；增量 → incremental。
+2. **定两个文档根**：`<DESIGN_DIR>`（默认 `docs/design/`）与 `<AUDIT_DIR>`（默认 `docs/audit/`）。读项目既有结构推断合理位置；推不出就问用户。定了以后全程沿用。
+3. **判定交互模式**：用户对话里自然出现 QPDI / Q.I / SCCO 等术语 → 专家模式；否则普通模式（默认）。**普通模式下所有面向用户的文字禁用内部术语**——不说 QPDI/SCCO/Q.I，用平实语言。
+
+### 第 1 步 · 意图落宪
+
+与用户对话，把浮现的意图落到 `<DESIGN_DIR>/principles.md`：
+
+- 核心意图按**追求 / 保护 / 不接受**三段式写；认知前提、经验教训分节记录。
+- 用**用户可读语言**写（普通模式绝不出现内部术语）；落地后向用户复述确认。
+- 专家模式：用户可直接提交 principles / architecture 草案。
+- takeover 模式：先走第 2 步还原，再回到本步让用户复审还原出的候选 Q（比凭空共创轻得多）。
+
+### 第 2 步 · 调研
+
+按 /workflow §4.1：梳理项目已有能力、外部方案、利弊对比、推荐方案。产出调研报告落 `<DESIGN_DIR>`。
+takeover 模式在此步做**构造性还原**：用 `/hoare-design` 风格自下而上从代码归纳模块契约（D 叶子），再向上归纳设计主干与意图草稿，产物明确标注"还原推测"。
+
+### 第 3 步 · 架构（起草 → 抽离 → 审查）
+
+1. **真实候选**：先做 2-3 个真实架构候选（不是一个真方案配两个稻草人），按 Q.A"精简主义"收敛——复杂度是成本，没有经验支撑的按最简单的走。
+2. **正向起草**：从具体问题出发写架构文档（/workflow §4.2 模板 + §4.2.1 架构正确性论证）。派 sub-agent 起草时**不要提前灌 QPDI 术语**——先面对具体材料，避免"先给分类再填内容"的空壳。
+3. **反向抽离**：从草稿反向归纳设计原则 / 局部规则，逐条标注 trace（这条规则支撑哪个设计选择、追到哪条意图）。起草与抽离是两个认知方向，分开做，不合并进同一遍。
+4. **架构公检法**：调 `/qpdi-tribunal` 审架构（上游 = principles，对象 = 架构文档）。
+
+### 第 4 步 · 细化 + 审查
+
+按 /workflow §4.3 做函数级细化（完整性 6 条 + 非平凡函数正确性论证），不得改变架构定下的模块划分与接口——要改就回第 3 步。完成后调 `/qpdi-tribunal` 审细化（重点：架构 ↔ 细化的一致性，可升格上溯）。
+
+### 第 5 步 · 实现 + 测试
+
+按 /workflow §5：逐模块实现、分层测试。**完成判据是命令真实跑通**（build / test 输出），修改落盘不等于完成。测试失败按 /workflow §5.4 处理，禁止改用例凑通过。
+
+### 第 6 步 · 终审
+
+对外（PR / 交付 / 发布）前调 `/qpdi-tribunal` 做终审。**终审总是完整重审一轮**，不因前序审查通过而跳过。incremental 模式下审查范围收窄到本子任务；其余模式全栈。
+
+### 贯穿纪律（全程适用）
+
+1. **证据锚定**：每步完成必须有 artifact / 命令结果 / 测试结果 / 审查 verdict / 用户原文之一锚定；"我已经完成了"不算。派了 sub-agent 不等于产物存在——验收落盘文件。
+2. **正反夹逼**：单向检查会留下未被 govern 的方向，AI 会在未约束侧找到字面合规、精神违背的逃逸路径。关键产出必须配独立的反向攻击（公检法承担）。
+3. **fresh context 审查**：上下文惯性会污染独立判断——你自己形成的理解与合理化倾向会传给审查者。严肃审查派全新上下文的 sub-agent，且派遣词不带你的预期结论。
+4. **决策升格**：触动以下任一 → 停下来问用户，不可静默改：(a) 修订 Q 层（意图/认知前提/经验条目）；(b) 触动已登记的已接受风险 / 设计权衡（AR-* / TR-*，见 §五 known-state）；(c) 触动 `⚠️ 人类关注` 标记；(d) 修复路径会引入新的 known-risk / known-tradeoff。反向纪律：不拿升格当逃避普通工程清理的借口——不触发以上四条的默认自己修。
+5. **Discover**：上游不足回上游补（Q.I 不全补 Q.I，D 错位重组 D），补完再继续；同一规则在多个不相干位置反复出现 → 提升到公共上游，不各处复写。
+6. **文档收敛**：本体系产生的一切**文档类**产物只落 `<DESIGN_DIR>` 与 `<AUDIT_DIR>` 两根之下（草稿放其 `.tmp/` 子目录），不在用户项目里另起散放目录。**代码豁免**：改用户项目源代码（src/ tests/ 等）是本分工作，不受此限。
+7. **升格呈现**：给用户看决策项时从具体现象讲起、说清为什么现有意图/规则覆盖不了、给真实候选与利弊推荐；不用内部编号和术语压迫用户（"D-017 违反 P-Squeeze" 是禁句）。
+
+## 五、推荐文件组织（**非强制**）
+
+以下是推荐模式，**不是硬性要求**——照应项目既有结构优先；与 /workflow §8 的目录约定天然兼容（可融合：principles 归 QPDI，feature 设计归 /workflow 结构）。
+
+```text
+<DESIGN_DIR>/                    # 默认 docs/design/
+  principles.md                  # Q 层宪法：意图（追求/保护/不接受）+ 认知前提 + 经验材料
+  architecture.md  或 architecture/   # D 主干：根承诺 + 依赖序展开 + 规则 + 工程约定
+  detail/  或 detailed-design.md      # 函数级细化（/workflow §4.3.3 模板）
+  known-state.md                 # 已接受风险 AR-* + 设计权衡 TR-*（每条：内容/确认人/重审条件）
+  .tmp/                          # ephemeral 草稿（intake / research 中间产物）
+
+<AUDIT_DIR>/                     # 默认 docs/audit/
+  round-NNN/                     # 每轮公检法留痕（见 /qpdi-tribunal）
+```
+
+要点：
+
+- **principles.md 是宪法**：修改它 = Q 层修订 = 必须经人确认（铁律）。
+- **known-state.md 是诚实登记簿**："我们承诺 X，但 X 内部已识别破口（AR）或已选择妥协（TR）"，条条经人确认；触动即升格（纪律 4）。它与"边界"不同——边界是不承诺的事，known-state 是承诺范围内的明文妥协。
+- 小项目可坍缩成单文件（principles + architecture 合一）；大项目可再分层。结构服务于"接手者能找全"，不服务于形式。
+
+## 六、四种接手模式
+
+| 模式 | 触发 | 做法 |
+|---|---|---|
+| **greenfield** | 项目空白 | 从第 0 步顺序走完整流程 |
+| **continue** | 有标准结构（含 principles）+ 全量维护 | 问用户从哪步起跑（如"只做终审"→ 直接第 6 步；"加功能"→ 第 1 步续），跳过的步骤完全不执行 |
+| **takeover** | 有东西但结构非标准 + 全量维护 | 第 2 步构造性还原（`/hoare-design` 风格自下而上归纳契约→设计→意图草稿，标注推测）→ 第 1 步用户复审定稿 → 之后同 continue |
+| **incremental** | 有东西 + 只加新子功能 | 新开子设计目录（如 `<DESIGN_DIR 父目录>/<topic>/`）承载新功能的完整设计；**既有设计文档只做最小对齐 + 交叉指引，不负责其整体一致性**；代码照常按需改。子体系内部走 greenfield 式流程 |
+
+不接受的退化：只会绿地全量生成；每种接手都变成重写全部；把还原推测冒充原始意图（必须标明）；增量把新功能核心设计塞进既有设计文档。
+
+## 七、轻量用法：材料归位
+
+不跑全流程、只想整理一段设计材料该放哪时，做四件事：判断层级（Q.I 意图 / Q.A 认知 / Q.E 经验 / 架构 / 规则约定 / 细化 / 审查留痕）→ 指出落点文件 → 只查最近邻对齐（上游支撑、下游承接、明显矛盾、陈旧重复）→ 分流可直接整理 vs 需用户裁决。按此格式回答：
 
 ```text
 层级判断：
 建议落点：
-源文件依据：
 上游支撑：
 下游承接：
 明显滞涩：
 可直接整理：
 需要用户裁决：
 ```
+
+## 八、相关 skill
+
+- `/workflow` — 工程流程骨架（规约模板 / 设计三阶段 / 实现测试 / 契约对照 v2 / 修复八部分）。本 skill 的承载底座。
+- `/qpdi-tribunal` — SCCO 公检法审查（第 3/4/6 步关卡；也可独立审任意材料）。
+- `/hoare-design` — 从既有代码反向还原设计规约（takeover 模式第 2 步的方法）。
+- `/hoare-audit`、`/finegrained-check` — 审查用的证明/找茬方法学（由 /qpdi-tribunal 挂载）。
+- `/principle-derivation-v2` — 问题意识驱动的设计推导（第 3 步架构论证的书写风格参考）。
