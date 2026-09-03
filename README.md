@@ -48,7 +48,7 @@
 
 ### 辅助 prompt
 
-- `occams-razor`: 围绕当前用户意图自动压缩无必要的设计与执行复杂度；抽象原则必须具体化却当前无法建立等价操作映射时，使用明确非等价的有限投影。其 QPDI 设计见 [`principles.md`](docs/occams-razor/principles.md)（Q）、[`architecture.md`](docs/occams-razor/architecture.md)（candidate P/D）与 [candidate `SKILL.md`](.pending/occams-razor/SKILL.md)（I）。
+- [`occams-razor`](current/occams-razor.md): 围绕既定对象重建其有效目标链与实际语境，递归删除可证明没有必要贡献的内容，并在交付前复查是否仍可收缩或因裁剪失去解释与充分性。其 QPDI 设计见 [`principles.md`](docs/occams-razor/principles.md)（Q）、[`architecture.md`](docs/occams-razor/architecture.md)（P/D）；真实语境重校准回放见 [`context-recalibration-cases.md`](docs/occams-razor/context-recalibration-cases.md)。
 - `finegrained-check`: 适合做更细粒度的检查或补充验证。
 - `evo-graph`: 用来梳理演进关系、推导路径或结构变化。
 - `make-survey-plan`: 用来设计 survey / organise / plan 类型的调研与整理流程。
