@@ -1,0 +1,219 @@
+# Tool Auth Lang：基于标签的工具调用审核
+
+## 1. 目标与验收要求
+
+Tool Auth Lang 用于描述工具调用审核规则。它采用 **tag-based parsing** 的思路：将调用解析成 tag / type 树，用户按节点内容和子树形状定义规则，调整树结构、添加标签和审核要求。方案提供 AI Review 的能力，用于审查脚本等内容及其行为是否符合规则。
+
+方案特性如下：
+
+- **覆盖范围**：覆盖绝大多数日常工具调用场景，包括完整解析 Shell 语法结构，并为 Git 等常用工具提供内置规则。
+- **表达能力**：严格超越现有正则匹配能力，并支持嵌套命令结构和对象访问规则。
+- **规则定制**：用户可以定义识别、构树和审核规则，也可以复用常用工具的内置套装，补充自己的限制。
+- **文件访问标签支持**：支持 NoRead、ReadOnly、Writable 等文件访问标签。通过内置或自定义规则识别常见命令的读写操作，再按目标文件的标签审核。例如，`p` 标记为 ReadOnly 时拒绝 `> p`，标记为 NoRead 时拒绝 `cat p`。
+- **审核与结果**：支持按子命令或脚本指定 AI Review；返回通过、拒绝或待审，拒绝时说明触发的规则和原因。
+
+## 2. 核心技术方案：逐步细化调用树
+
+**在同一调用的 parsing tree 上调整子树、添加标签并应用审核规则。** 以 Shell 调用为例：
+
+1. [Base Rule] 解析 Shell：区分命令、组合关系和重定向，形成 base parsing tree
+2. [Refinement Rules] 应用工具规则：按 Git、Python 的调用格式组织词元，调整 base parsing tree 中的子树，形成 refined parsing tree
+3. [Tagging Rules] 应用标记规则：在 refined parsing tree 上通过节点内容、形状模式匹配等方式标记对象，指定例如文件限制和 AI Review 要求等
+4. [Re-interpretation Rules] 根据节点结构和标签作出审核判断，并汇总结果：决定整次调用通过、拒绝或需要 AI Review
+
+用户可以通过定义从 [Refinement Rules]、[Tagging Rules] 到 [Re-interpretation Rules] 的规则，定义命令识别、子树调整、对象标记和审核规则；系统内置 Git 等常用命令的规则套装，用户可按需加载，无需每次手动定义。
+
+任一规则拒绝时，拒绝整次调用，不启动 AI Review。没有拒绝但还有待审要求时，将这些要求交给一次 AI Review。**所有适用要求通过，整次调用才获准执行。**
+
+## 3. 案例：Git、Python 与输出文件
+
+### 3.1 起点：Shell 树
+
+下面这次 Bash 调用先查看暂存文件名，再运行发布检查脚本。前两段执行成功后，运行提交命令，并将提交命令的标准输出写入日志。
+
+```bash
+git -C services/payments diff --cached --name-only &&
+python3 tools/check_release.py &&
+git -C services/payments commit -m 'release: 1.4' > reports/commit.log
+```
+
+**[案例前提]** 工作目录为 `/repo`；`git`、`python3` 分别运行 Git 和 Python 解释器；参数使用命令中给出的字面值，所用目录和审查材料存在。
+
+**审核在调用执行前完成。** 图中字符串按命令原文书写，方括号列出该节点的子项。`&&` 表示前一段成功后才执行后一段；`>` 只重定向最后一个命令的输出。
+
+```text
+Shell.And
+├─ Shell.And
+│  ├─ C1: Command["git", "-C", "services/payments", "diff", "--cached", "--name-only"]
+│  ├─ "&&"
+│  └─ C2: Command["python3", "tools/check_release.py"]
+├─ "&&"
+└─ Shell.RedirectedCommand
+   ├─ C3: Command["git", "-C", "services/payments", "commit", "-m", "'release: 1.4'"]
+   └─ R1: OutputRedirect
+      ├─ Operator(">")
+      └─ T1: TargetWord("reports/commit.log")
+```
+
+Shell 语法中，`>` 后跟一个目标词；本图用 `TargetWord` 表示它，`R1.target` 指向节点 `T1`。[1]
+
+### 3.2 工具规则：将词元组织成子树
+
+Git 规则从命令位置的 `git` 开始识别：`-C` 与后面的目录组成全局选项，`diff`、`commit` 标明子命令，`-m` 与后面的文本组成消息选项。Python 规则把 `python3` 后面的路径识别为本次要执行的脚本；脚本内容留给后面的审查。
+
+```text
+Shell.And
+├─ Shell.And
+│  ├─ C1: Shell.Command
+│  │  └─ Git.Invocation
+│  │     ├─ "git"
+│  │     ├─ Git.CwdOption["-C", "services/payments"]
+│  │     └─ Git.Diff
+│  │        ├─ "diff"
+│  │        ├─ "--cached"
+│  │        └─ "--name-only"
+│  ├─ "&&"
+│  └─ C2: Shell.Command
+│     └─ Python.Invocation
+│        ├─ "python3"
+│        └─ Python.ScriptFile["tools/check_release.py"]
+├─ "&&"
+└─ Shell.RedirectedCommand
+   ├─ C3: Shell.Command
+   │  └─ Git.Invocation
+   │     ├─ "git"
+   │     ├─ Git.CwdOption["-C", "services/payments"]
+   │     └─ Git.Commit
+   │        ├─ "commit"
+   │        └─ Git.MessageOption["-m", "'release: 1.4'"]
+   └─ R1: OutputRedirect
+      ├─ Operator(">")
+      └─ T1: TargetWord("reports/commit.log")
+```
+
+**树增加了 Git、Python 的节点，原词元、引号、命令组合和重定向关系不变。** `-C services/payments` 改变该 Git 调用的工作目录，不改变 Shell 的工作目录。Python 脚本路径和重定向目标按 `/repo` 解释，分别为 `/repo/tools/check_release.py` 和 `/repo/reports/commit.log`。[1][2]
+
+注意，上面的 Refinement Rules 本质是用户可以自定义的，而对常用命令，例如 `git` 等，我们将会提供一套 Builtin 的默认规则，以方便用户更快速进行配置。
+
+### 3.3 标记规则：添加标签与审核要求
+
+文件权限可以用“路径正则 → 权限标签”配置。标记规则选中文件引用节点，如 `OutputRedirect` 下的 `TargetWord`，按上下文解释其路径，再匹配路径正则，将命中的权限标签附到该节点。表中正则采用全匹配；其他工具的文件引用节点也可复用这组权限配置。
+
+| 配置对象 | 用户配置 |
+|---|---|
+| 文件路径正则 `/repo/reports/[\s\S]*` | **ReadOnly**；另一种配置可改为 **Writable** |
+| 文件路径正则 `/repo/config/[\s\S]*` | 可读，但为 **ReadOnly**，发布检查不得修改 |
+| C2 的脚本对象 | 允许读取审查材料，要求 **AI Review**：检查是否修改不允许修改的文件、向外发送凭证，或执行与发布检查无关的操作 |
+| C3 的 `Git.Commit` | 用户可以要求 **AI Review**：检查命令中的提交说明是否符合发布任务；参考 `/repo/docs/release-plan.md` |
+
+本例中，`T1` 所指文件的路径 `/repo/reports/commit.log` 命中第一条正则，得到 `ReadOnly` 标签。各项配置应用到节点上的结果如下：
+
+```text
+R1.target → File("/repo/reports/commit.log") & ReadOnly
+C2.script → ScriptFile("/repo/tools/check_release.py") & AIReview
+C3        → Git.Commit & AIReview（用户可选）
+```
+
+下面是附加属性和标签后的完整树，采用上表的 ReadOnly 输出配置，并启用 C3 的可选审查。花括号表示节点属性，`&` 后是标签；审查要求沿用上表。
+
+```text
+Shell.And {cwd: /repo}
+├─ Shell.And
+│  ├─ C1: Shell.Command
+│  │  └─ Git.Invocation {cwd: /repo/services/payments}
+│  │     ├─ "git"
+│  │     ├─ Git.CwdOption["-C", "services/payments"]
+│  │     └─ Git.Diff
+│  │        ├─ "diff"
+│  │        ├─ "--cached"
+│  │        └─ "--name-only"
+│  ├─ "&&"
+│  └─ C2: Shell.Command
+│     └─ Python.Invocation {cwd: /repo}
+│        ├─ "python3"
+│        └─ Python.ScriptFile["tools/check_release.py"] & AIReview {file: /repo/tools/check_release.py}
+├─ "&&"
+└─ Shell.RedirectedCommand
+   ├─ C3: Shell.Command
+   │  └─ Git.Invocation {cwd: /repo/services/payments}
+   │     ├─ "git"
+   │     ├─ Git.CwdOption["-C", "services/payments"]
+   │     └─ Git.Commit & AIReview {review_material: /repo/docs/release-plan.md}
+   │        ├─ "commit"
+   │        └─ Git.MessageOption["-m", "'release: 1.4'"]
+   └─ R1: OutputRedirect
+      ├─ Operator(">")
+      └─ T1: TargetWord("reports/commit.log") & ReadOnly {file: /repo/reports/commit.log}
+```
+
+以上记法用于展示标签与节点的关系，不是最终配置语法。添加标签不要求增加树层级。**标签来自用户配置，待审命令不能自行声明访问权限。** ReadOnly 在本例表示禁止写入；Writable 表示这项写检查通过，其他规则还要检查。设置这些标签不会修改操作系统的文件权限。
+
+### 3.4 按规则判断：通过、拒绝或待审
+
+`R1` 请求写入目标文件，将这项操作与文件标签一起检查：
+
+```text
+R1 请求 Write(target)，即写入目标文件
+Write(target) + ReadOnly(target) → Deny
+Write(target) + Writable(target) → 该项检查 Pass
+```
+
+用户也可以针对 C3 的 Git.Commit 增加禁止规则，无需改动 Git 的识别规则。文件检查、Git 检查和 AI Review 的结果都参与整次调用的判断：
+
+| 配置或审查结果 | 整次调用的判断 |
+|---|---|
+| 输出区域是 ReadOnly | **Deny**：`>` 请求写入 `/repo/reports/commit.log`，违反 ReadOnly 写保护；不启动 AI Review |
+| 输出区域是 Writable，但用户禁止 Git.Commit | **Deny**：触发禁止 Git.Commit 的规则；不启动 AI Review |
+| 输出区域是 Writable，没有其他拒绝，有一项或多项审查要求 | **AI Review**：把这些要求合并为一次审查 |
+| 这次审查的所有要求通过 | **Pass**，允许原调用执行 |
+| 任一审查要求被拒绝 | **Deny**，指出对应对象、规则与原因 |
+
+执行到最后一段时，Shell 会在启动 Git 前打开或截断输出文件。[1] 本方案先审核整次 Bash 调用，再允许执行；因此，拒绝时不会运行前面的 Git / Python，也不会清空输出文件。
+
+### 3.5 AI Review：多项要求，审查一次
+
+C2、C3 都需要审查时，将两个节点的对象和要求交给同一次 AI Review：
+
+- **C2**：Python 脚本，以及工作目录、文件区域标签和发布检查目的。
+- **C3**：Git.Commit 子树，以及指定的发布任务说明。
+
+**向审查者提供只读文件工具**，允许它读取脚本、授权范围内与审查有关的依赖和指定材料。一次审查可以包含多次文件读取，不按节点分别启动审查。
+
+例如，假设审查确认脚本会覆盖 `/repo/config/release.json`，则依据 ReadOnly 要求拒绝。若脚本检查与提交说明检查都通过，则整次调用通过。**审查未完成、必要材料无法读取或缺少必要结论时，不允许调用执行。**
+
+**案例要点：** 规则组织命令结构、标记对象，并判定哪些操作允许、哪些需要 AI Review。有一项拒绝就拒绝整次调用；待审要求合并审查。
+
+## 4. 技术依据与适用范围
+
+### 4.1 相关研究支持哪些能力
+
+| 已有研究 | 可使用的机制 |
+|---|---|
+| **[源证] Knuth，属性文法，1968** [3] | 节点上的数据按依赖关系计算：父节点可向子节点提供上下文，子节点的数据可汇总到父节点 |
+| **[源证] Silver，2010** [4] | 节点可以保存和构造语法树，规则可以扩展已有定义，用于增加本例的工具子树 |
+| **[源证] Okhotin，合取文法** [5] | 同一输入可以要求多组约束同时成立；这些约束本身不负责增加树的层级，也不保证得到唯一一棵树 |
+
+**[推导]** 本例需要构造工具子树、查询标签和汇总审核结果，上述机制可以表达这些操作。节点及其引用的源码或文件提供 AI Review 的对象。引用属性文法不等于要求用户另写一套属性语言。
+
+用户可以编写规则套装，定义命令识别和子树结构，复用文件标签，并为子命令或选项增加限制。**[推导]** 保留现有正则匹配能力，再加入递归结构和节点数据计算，表达能力可以超出当前正则匹配器。例如，递归规则可以识别不限层数的括号嵌套；多个正则表达式取交集，仍不能识别这种结构。[5][6]
+
+### 4.2 审核限制
+
+- **文件参数不能说明程序怎样使用文件。** 仅看到 `my-program file`，不能判断程序会读文件还是写文件，需要工具规则或代码审查提供行为信息。脚本依赖、路径指向哪个文件、Git 会提交哪些文件，也不能只从命令文本得出。本例对 C3 检查的是命令和任务说明，不是全部提交内容。
+- **论文中的机制不等于审核结果正确。** 构树规则还须保留原词元及 Shell 的命令组合、重定向关系。这些研究不保证用户定义的任意规则组合都正确、无冲突或能结束计算；AI Review 也可能误判。
+
+**结论：用户可以复用内置套装或自定义规则，识别命令、调整子树、设置标签和审核要求。审核结果决定整次调用是否执行。** 现有研究支持本例所需的构树和数据计算，整套方案的效果与性能还需要原型验证。
+
+## 参考资料
+
+[1] GNU Bash：[Lists of Commands](https://www.gnu.org/software/bash/manual/html_node/Lists.html)、[Redirections](https://www.gnu.org/software/bash/manual/html_node/Redirections.html)。
+
+[2] Git：[全局选项（v2.50.1）](https://github.com/git/git/blob/v2.50.1/Documentation/git.adoc)、[git-diff](https://git-scm.com/docs/git-diff)、[git-commit](https://git-scm.com/docs/git-commit)。
+
+[3] D. E. Knuth, *Semantics of Context-Free Languages*, 1968：[论文](https://www.ccs.neu.edu/home/chadwick/files/knuth.pdf)。
+
+[4] E. Van Wyk 等，*Silver: An Extensible Attribute Grammar System*, 2010：[论文](https://www-users.cse.umn.edu/~evw/pubs/vanwyk10scp/vanwyk10scp.pdf)。
+
+[5] A. Okhotin, *A Recognition and Parsing Algorithm for Arbitrary Conjunctive Grammars*, 2003：[DOI](https://doi.org/10.1016/S0304-3975(02)00853-8)；*Describing the Syntax of Programming Languages Using Conjunctive and Boolean Grammars*, 2020：[论文](https://arxiv.org/abs/2012.03538)。
+
+[6] Rust `regex`：[crate 文档](https://docs.rs/regex/latest/regex/)。
