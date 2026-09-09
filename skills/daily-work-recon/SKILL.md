@@ -18,10 +18,10 @@ Do not treat session count, tool activity, or a fixed report template as the goa
 
 ## QPDI Design
 
-- **Q**: help the user recover each relevant conversation path, understand the day's actual work and working state, and draw only grounded conclusions about what changed, what was learned, and what remains open.
-- **P**: distinct paths are not collapsed into a false linear history; shared history and repeated progress are counted once; work progress is distinct from conversation history; important conclusions can be traced back; the report reflects the user's actual energy distribution across stacks; time and attention claims keep their evidence boundary; the output contains no repeated or unsupported material.
-- **D**: `find` → `distinguish conversation paths when needed` → `recalibrate each transcript` → `integrate working stacks` → `analyse how` → `render`.
-- **I**: inspect relevant session records and only the artifacts or command results needed to support the requested claims; write the requested report and evidence packets.
+- **Q**: help the user recover each relevant conversation path, understand the day's actual work and working state, resume still-relevant work across days, and draw only grounded conclusions about what changed, what was learned, and what remains open.
+- **P**: distinct paths are not collapsed into a false linear history; shared history and repeated progress are counted once; work progress is distinct from conversation history; important conclusions can be traced back; the report reflects the user's actual energy distribution across stacks; time and attention claims keep their evidence boundary; execution and user reception remain distinct; cross-day reminders serve an evidenced next step; the output contains no repeated or unsupported material.
+- **D**: `find` → `distinguish conversation paths when needed` → `recalibrate each transcript` → `integrate working stacks and relevant carryovers` → `analyse how` → `render`.
+- **I**: inspect relevant session records, recent reports, and only the artifacts or command results needed to support the requested claims; write the requested report and evidence packets.
 
 ## 1. Find
 
@@ -128,6 +128,15 @@ For each stack:
 
 This is the day's **What/How progress material**. Do not extract key outcomes, lessons, or reflection as a parallel account before this integration exists.
 
+### Ongoing work across days
+
+Preserve continuity of real work, not a second todo inventory: the user should see what to inspect, wait for, or resume without rereading the history.
+
+- Each day, reconcile today's stacks with recent reports and previously open items. Carry forward still-relevant obligations even without today's conversation; retire completed, superseded, or abandoned ones.
+- For each material item, keep its last dated substantive change, current evidence/cutoff, and next needed action or person. Distinguish AI execution, delivered results awaiting review, and actual blockers. No feedback does not prove unread work; an old running status does not prove present activity. Ordinary completed answers do not automatically become review obligations.
+- Use comparisons to flag potentially dropped work, missing support or reception, and absence of observed progress. Tie reminders to a still-valid goal and useful next step; prioritize consequence and user priorities, not age alone. Missing days are unknown, not proof of stagnation.
+- Start with existing reports; check only source tails or receipts that could change a significant reminder. Reuse resume points in one ongoing-work section, link rather than repeat history, and do not rerun project audits or restart old tasks merely to review their status.
+
 ## 4. Analyse How
 
 Only after the day's working stacks are integrated, examine how the user worked across them:
@@ -161,7 +170,7 @@ When this evidence exists, report the **concrete matter itself**: the actual mec
 
 A content-matching follow-up proves that the user read and worked with that specific material; it does not by itself prove unconditional acceptance. Preserve disagreement, correction, and uncertainty.
 
-If an answer exists but no later message shows uptake, write “the AI answered X; no later user message confirms uptake” when that boundary matters, or omit it from learning. Never mine the subject matter of the user's request for a philosophical lesson merely because the problem sounds deep.
+If an answer exists but no later message shows uptake, omit it from learning; include the answer in direct history when relevant. Mention missing reception only when it affects a substantive judgment or an actual review need, not as a routine disclaimer. Never mine the subject matter of the user's request for a philosophical lesson merely because the problem sounds deep.
 
 Reflection is optional. Include it only when the user explicitly formulates a changed principle, demonstrates a change across turns, or when repeated evidence supports a bounded method update. Otherwise omit it.
 
@@ -205,7 +214,7 @@ Order stacks by the user's energy ranking (highest first), not by transcript num
 
 - the main-investment stacks get the fullest direct history and How material;
 - low-investment stacks get proportionally compressed treatment — their detail lives in the evidence packets;
-- note the ranking basis explicitly in the report (one short block: criteria + evidence boundary).
+- show the main focus through the user's concrete follow-ups and decisions; keep scoring criteria and mechanical statistics in the evidence files, not a methodology block in the report.
 
 ### Raw data for energy assessment
 
@@ -228,9 +237,20 @@ Generate only the output the user requested. When writing a broad daily log into
 
 Do not create `timeline.md`, `outcomes.md`, `human-response.md`, `ai-techniques.md`, or `time.md` by default. Add another evidence file only if the user's question cannot be expressed by the index and transcript recalibrations.
 
+### Reader-facing content
+
+The report is about the user's work, not how you assembled it.
+
+- Never include collection or update narration, verification/compliance disclaimers, counting or classification rules, self-instructions, or reminders about how the report must be written. Apply the rules privately; write the actual event, result, and current state. Do not announce that you omitted this material either.
+- Keep source maps, mechanical statistics, collection limits, and method notes in the index or evidence packets. The report needs only a brief cutoff, necessary scope, and evidence links.
+- Keep a factual limit only where it changes a substantive conclusion or next action. State it once and directly: “draft delivered; not installed”, not “delivery must not be mistaken for installation”. Failures and checks in the user's work remain relevant when they explain its outcome; the report writer's compliance checklist does not.
+- For incremental requests, reuse existing material and read only relevant additions. Update affected overview, history, conclusions, and ongoing-work entries in place; remove stale states rather than narrating their replacement. Do not append a supplement unless requested.
+
+Describe reconstruction itself only when the user asks to assess that work; even then, report actions and consequences, not self-instructions.
+
 ### `evidence/INDEX.md`
 
-Record only the source map and mechanical relationships:
+Record the source map, mechanical relationships, and necessary collection/method notes:
 
 ```markdown
 # Evidence Index
@@ -263,9 +283,8 @@ Write one local packet per transcript from section 2. Distinguish its conversati
 # <YYYY-MM-DD> — Daily Recalibration
 
 > Cutoff: `<ISO-8601 with timezone>`
-> Scope: `<session source(s) / stated scope>`
-> Sources examined: `<count and human-readable summary>`
 > Evidence: [`evidence/INDEX.md`](evidence/INDEX.md)
+<Add a brief scope only when needed to understand the report's coverage.>
 
 ## Today's Working Stacks
 
@@ -290,7 +309,7 @@ Write one local packet per transcript from section 2. Distinguish its conversati
 
 ## How the Work Moved
 ### Energy distribution
-<Where the user's attention plausibly went, by stack: criteria (content-match precision first), evidence, and boundary — conditional inference only.>
+<Which stacks received the user's attention, shown through concrete follow-ups and decisions; do not explain the assessment procedure.>
 ### How you made decisions
 <Corrected AI, changed direction, verified work; engagement modes (rule-setting / probing / steering).>
 <Concrete answer material that later user messages demonstrably took up; state the matter itself, not an abstraction of it.>
@@ -303,8 +322,9 @@ Write one local packet per transcript from section 2. Distinguish its conversati
 ## Reflection and Recalibration
 <Optional. Include only an explicit or demonstrable change in the user's own principle or method. A problem the user brought to the AI is prior problem awareness, not today's reflection. When the user learned from an answer, report the concrete matter under How instead of philosophically rewrapping it here. Omit this section when no independent reflection is supported.>
 
-## Unclosed
-<Only work that materially affects the next continuation or limits today's conclusion.>
+## Ongoing Work and Cross-day Reminders
+<Use section 3: relevant unfinished work, including dated AI execution and delivered material with an actual review need; current state, evidence and next action/person.>
+<Briefly compare recent substantive changes and identify actionable gaps, with the latest dated state and next action; omit bookkeeping instructions.>
 ```
 
 A report may name or link the transcript paths that support a stack, but should not repeat their full content. The packets preserve each relevant path's history; the report explains how those histories jointly moved the day's real work.
@@ -316,7 +336,7 @@ A report may name or link the transcript paths that support a stack, but should 
 - Use the user's existing words. Introduce a new term only when failing to distinguish it would change the conclusion or next action.
 - Do not use “tension”, “bridge”, “candidate”, QPDI layer labels, or philosophical vocabulary merely to organize prose. Retain such a term only when it is the user's established term or the exact distinction changes the judgment, and explain it immediately.
 - A user question or correction is not evidence of learning. Require post-answer uptake evidence, and report the concrete learned matter rather than an abstract lesson.
-- State what a result supports and what it does not support.
+- Preserve factual limits that change the conclusion or next action; state them directly where relevant, without repeating generic cautions.
 - Verify artifacts only for strong claims: a research conclusion, design, implementation, test result, or scoped change.
 - A test invocation is not a passing test; a staging directory is not a completed delivery.
 - A single-day observation is not a general personal pattern without a stated bridge and scope.
