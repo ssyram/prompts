@@ -1,28 +1,75 @@
 ---
 name: recalibration
-description: Reconstruct the global state of long-running work into independent working lines and their working stacks. Use when the user asks where the work stands, what has been done, what comes next, how tasks evolved, or how to regain focus after long or multi-task execution.
+description: Reconstruct and test the direction of long-running work across independent lines and their stacks. Use to regain focus, check whether the current path is justified, or recover progress and the knowledge needed to continue.
 ---
 
 # Recalibration
 
 ## Purpose
 
-Restore the user's global work orientation. Explain the whole active portfolio through its current working stacks, evidence-backed progress, selected top, next action, and compact popped-frame history.
+Restore the user's global work orientation and current direction. Explain the active portfolio through its working stacks, evidence-backed progress, selected top, next action, and compact popped-frame history.
 
-This prompt is not for judging or paraphrasing the user's latest statement. Treat the invocation message only as a scope selector. Use a dialogue-review prompt separately when the task is to test whether the latest statement was understood or is correct.
+Do not merely summarize state. Recover a bounded working understanding of the user's purpose, test whether the current focus and its necessary parent plans still have reasons to continue, and directly correct the analysis, recommended order, or next recommendation when they do not. Returning to the same purpose does not mean returning to the earlier state of knowledge: a candidate may lose its reason while discoveries made through it remain relevant.
+
+A point-by-point dialogue critique of whether one latest statement was understood or correct remains a separate dialogue-review task. That distinction does not demote an invocation correction: when it bears on current direction, assess it with the request history, explicit decisions, and other authority.
+
+## Invocation material
+
+$ARGUMENTS
+
+Use the supplied request to establish this round's scope, question, corrections, and explicit authorization. Read it with the relevant history; honor explicit updates rather than silently restoring superseded intentions. Distinguish a request to calibrate from an explicit instruction to plan or execute: passing that instruction through this template neither removes its authority nor enlarges its scope. Inferred intent does not itself authorize execution.
 
 ## Evidence and authority
 
-Reconstruct state from available conversation history and, when present:
+Reconstruct state and direction from available conversation history and, when present:
 
-1. user decisions for goals, priorities, acceptance, and abandonment;
-2. native task state for readiness, dependencies, and execution status;
-3. parent verification, actual files, diffs, tests, and published results for completion evidence;
-4. master or mission ledgers as readable portfolio mirrors;
-5. worker reports as evidence awaiting verification;
-6. conversation inference only for explaining evolution.
+1. user requests, corrections, decisions, priorities, acceptance, and abandonment;
+2. authoritative object facts, actual files, diffs, tests, and published results;
+3. native task state for readiness, dependencies, and execution status;
+4. parent verification and accepted design or task relationships;
+5. master or mission ledgers as readable portfolio mirrors;
+6. worker reports as evidence awaiting verification;
+7. bounded conversation inference only where it helps explain the task's evolution or current meaning.
 
-If these conflict, report the conflict. Do not silently choose a convenient state.
+Keep distinct: original requirements, object or domain facts, accepted plans or local contracts, factual task states, and this round's inferences. If they conflict, report the conflict rather than silently choosing a convenient state.
+
+Behavior and context can support a bounded interpretation, not mind-reading, personality claims, or proof of psychological cause. Compare the actual request with explicit corrections, acceptance or rejection, the object's use, and the work situation. Explicit correction outranks inference. Do not treat silence, continued discussion, emotional intensity, repeated terms, downstream detail, or a coherent narrative as full acceptance or new authorization.
+
+## Recover and test direction
+
+Do this direction check during every recalibration, not only after an obvious failure or before a separate reflection exercise. Open only the history and materials needed to resolve a live reason, conflict, or uncertainty; do not default to a full historical audit.
+
+### 1. Suspend recent framing
+
+Set aside the most recent high-frequency terms, AI-generated frameworks, process organization, and the current candidate long enough to reread the relevant request, corrections, acceptance or rejection, and authoritative evidence. Do not let a useful method, current artifact property, or recently active side line replace the task it was meant to serve.
+
+### 2. Form a working understanding that can guide a choice
+
+State what the user is trying to change, achieve, protect, or avoid; what the object is for; and the actual constraints and facts that bear on the live work. Compare plausible interpretations against the evidence above. A recovered understanding is adequate only if it can explain how to understand the current task, what to retain or exclude, whether order should change, or why a next move is warranted; a story that merely sounds coherent is not enough.
+
+### 3. Trace the reason chain
+
+Check the current direction of each live line within the requested scope. Trace its local obligation through the parent responsibilities needed to reach a sufficiently supporting higher purpose; do not default to auditing every historical branch. Each link needs a user decision, accepted design relation, or actual task relation. A child task's need cannot prove its parent necessary, and a root purpose cannot bypass an accepted local contract to justify arbitrary detail. Lack of verbatim permission is not itself a bar to a valid inference grounded in the request, facts, and accepted contract.
+
+### 4. Separate history from current reassessment
+
+For relevant historical material, distinguish what happened and what reasons were supportable then from what this round now concludes about its significance. Historical occurrence does not require present continuation, and present uselessness does not prove earlier lack of reason. Do not use a later theory, finished artifact, or downstream dependency to fabricate the original motive or authorization.
+
+Retain verified results still needed by the live reason chain, confirmed rejection boundaries, object relationships, negative counterexamples, and unresolved clues with their conditions. Withdraw the authority of unsupported process residue over the current interpretation; do not erase the historical record. Discovering a relation through one candidate neither confines it to that candidate nor makes it mandatory for every implementation. Call a relation necessary only when the original requirement and relevant facts support that necessity; repeated encounters with it are not proof. A non-necessary mechanism is not thereby forbidden.
+
+### 5. Turn the understanding into direction
+
+Use the recovered understanding to confirm or revise the current interpretation, candidate, strategy, ordering, or smallest next action. Say what it supports, excludes, and leaves uncertain. Improved judgment may legitimately leave the same plan and next action in place; do not manufacture a new concept, task, dependency, or action merely to show movement.
+
+## Deepen only when a concrete understanding problem remains
+
+Recalibration itself performs the preceding interpretation and reason test. Load and apply the complete `reflect-and-proceed` skill when continuing well requires re-forming or deepening the working understanding of the original problem. Identify the understanding question from the recovered material; a user who asks to step back need not supply a diagnosis first. This threshold is about the need for deeper understanding, not apparent severity, task age, a fixed cycle, or whether work has visibly drifted.
+
+Use the available skill or resource-loading mechanism to load and apply the complete skill; where installed, its native user command is `/skill:reflect-and-proceed`. Mentioning a slash name is not loading it. Pass the recovered original problem, explicit decisions, relevant facts, still-valid exploration results, and the precise question; reading the method does not add execution authority.
+
+On return, check the skill's sources, inference labels, authorization boundary, and factual states before integrating its deeper understanding, supported or excluded implications, conditions or gaps, and continuing recommendation into this calibration. Do not create a mutual invocation loop: the skill does not call recalibration back, and recalibration does not automatically reload it merely because an open question remains. The responsible method may refine its reasoning with relevant material until its completion condition is met; a distinct later understanding question must be scoped and justified rather than triggered by a fixed pass count or a required new user turn.
+
+If the complete resource is unavailable, identify the specific missing material, do the bounded direction check that the available evidence supports, and do not claim that deeper reflection was completed.
 
 ## Build the portfolio
 
@@ -60,7 +107,7 @@ When an accepted or expired frame is popped, retain one compact record under its
 - **Result:** what it established or why it expired;
 - **Evidence / live residuals:** only what is needed to understand or audit that result.
 
-Do not expand ordinary tasks, failed attempts, or discarded options inside a popped frame unless the user explicitly requests that audit depth.
+Keep popped records compact. Expand related attempts or discarded options only as needed to assess a live justification, recover relevant learning, or answer the user's request; do not promote those ordinary tasks into stack frames.
 
 ### 4. Calibrate progress
 
@@ -70,7 +117,7 @@ Do not collapse distinct states:
 planned ≠ dispatched ≠ returned ≠ verified ≠ accepted
 ```
 
-Write `done` only for verified or accepted work. Preserve task evolution in its owning working stack, but keep popped frames compact and separate from the current control view. Omit chat-by-chat noise and raw orchestration logs.
+Write `done` only for verified or accepted work. Preserve task evolution in its owning working stack, but keep popped frames compact and separate from the current control view. Omit chat-by-chat noise and raw orchestration logs. A direction recommendation never rewrites factual execution state.
 
 ### 5. Answer the current-state questions
 
@@ -78,15 +125,15 @@ For every live line answer:
 
 - **Goal:** what final outcome does this line seek?
 - **Stack:** which live frames lead to the current top?
-- **Established:** which popped-frame results are still prerequisites of the current top?
+- **Established:** which verified results and supported discoveries from live or popped work still support this line, and under what conditions?
 - **Current:** what is selected, running in the background, blocked, or awaiting verification?
 - **Next:** what is the smallest current action?
 
-Then identify the portfolio's sole selected focus without treating it as a ban on asynchronous progress in other working stacks.
+Keep new interpretations and unresolved clues visibly tentative rather than presenting them as established results. Then identify the portfolio's sole selected focus without treating it as a ban on asynchronous progress in other working stacks.
 
 ## Output shape
 
-Render two views over the same underlying task and stack state. They are not separate ledgers or authorities.
+Render two views over the same underlying task and stack state; include only the direction evidence needed to make the current judgment intelligible, not a large reflection report.
 
 ### Print A — Current Stack View
 
@@ -94,10 +141,16 @@ Render two views over the same underlying task and stack state. They are not sep
 Global goal:
 - ...
 
+Direction check:
+- Recovered understanding:
+- Reasons that still support / no longer support the live directions:
+- Boundaries, conditions, or unresolved evidence:
+- Direction and next move:
+
 Working line A — <name>
 - Goal:
 - Stack: root live frame → ... → current top
-- Established: <only popped results still required here>
+- Established: <verified results and supported learning from live or popped work; relevant conditions>
 - Current: <selected / background / blocked / verification>
 - Next:
 
@@ -110,7 +163,7 @@ Portfolio focus:
 - Queued / blocked / verification:
 - Look at now:
 
-Final sentence: <global goal + actual state + next move>
+Final sentence: <global goal + actual state + justified next move>
 ```
 
 ### Print B — Popped Frame View
@@ -125,17 +178,17 @@ Working line A — <name>
   - Evidence / residual: <only when still useful>
 ```
 
-This view preserves frame-level evolution without mixing it into the current stack. Do not promote ordinary completed tasks to popped frames. A small portfolio with no popped frames may omit Print B. Expand a record only when the user requests history/audit or a current conflict depends on its internals.
+Do not promote ordinary completed tasks to popped frames. A small portfolio with no popped frames may omit Print B.
 
 ## Guardrails
 
 - Do not begin with the latest worker, reviewer, run ID, or callback unless it defines the global state.
-- Do not let the most recently active side line erase the main line.
-- Do not dump task or ledger rows without translating them into the user's goals.
-- Do not invent dependencies between useful but independent lines.
-- Do not hide unresolved names, mappings, conflicts, or missing evidence.
-- Do not mix popped-frame evolution into the Current Stack View.
-- Do not flatten popped frames into a global history list; keep each record under its owning working stack and structural position.
+- Do not let the most recently active side line erase the main line or define its purpose.
+- Do not dump task or ledger rows without translating them into the user's goals and the reasons that still support them.
+- Do not invent dependencies, make an ordinary task a stack frame, or turn a discussed method into an independent goal.
+- Do not hide unresolved names, mappings, conflicts, missing evidence, or a break in the reason chain.
+- Do not mix popped-frame evolution into the Current Stack View or flatten it into a global history list.
 - Do not let Print A and Print B maintain conflicting state; both are projections of the same native tasks, evidence, and stack structure.
-- Do not perform work, change task state, or redesign the portfolio unless separately authorized; this prompt reconstructs and reports it.
-- End with one short sentence that lets the user recover goal, present position, and next move.
+- A calibration request permits correction of this analysis, report, direction judgment, and next recommendation; it does not by itself authorize execution, change project or task state, or settle user-reserved tradeoffs.
+- Preserve explicit, still-valid authorization in the current request or prior mandate; do not enlarge it because an intent was inferred, an analysis was performed, or a skill was loaded.
+- End with one short sentence that lets the user recover goal, present position, and justified next move.
