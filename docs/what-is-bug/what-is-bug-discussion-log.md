@@ -2,7 +2,7 @@
 
 > 按原会话消息顺序整理的脱敏讨论文本。保留用户纠正和助手当时的答复，包括后来被否定的答复；这些历史答复不是现行规范。工具调用、工具回显和自动通知省略。用户消息附带的重复资源正文省略。本文只记录本次会话可见的分支，并非其它会话的全集。
 
-> 原始动因与分阶段事实见 [发生记录](docs/what-is-bug/evolution/archaeology.md)；后见分析见 [经验反思](docs/what-is-bug/evolution/reflection.md)。现役正文见 [current/what-is-bug.md](current/what-is-bug.md)。
+> 原始动因与分阶段事实见 [发生记录](evolution/archaeology.md)；后见分析见 [经验反思](evolution/reflection.md)。现役正文见 [current/what-is-bug.md](../../current/what-is-bug.md)。
 
 ## E001 · 用户
 

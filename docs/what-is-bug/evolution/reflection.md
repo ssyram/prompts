@@ -1,6 +1,6 @@
 # What is a Bug：经验反思
 
-本文从本次会话提取经验。它是后见分析；事实顺序见[发生记录](archaeology.md)，用户纠正与助手原话见[讨论记录](../../../what-is-bug-discussion-log.md)。
+本文从本次会话提取经验。它是后见分析；事实顺序见[发生记录](archaeology.md)，用户纠正与助手原话见[讨论记录](../what-is-bug-discussion-log.md)。
 
 ## 1. 运行事实与 Bug 结论之间，仍有规范与合法性关系
 

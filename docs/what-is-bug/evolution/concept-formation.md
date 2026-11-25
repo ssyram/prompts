@@ -1,6 +1,6 @@
 # What is a Bug：概念形成的后见整理
 
-本文是根据[发生记录](archaeology.md)与[讨论记录](../../../what-is-bug-discussion-log.md)作出的概念重构，不代替原始消息，也不声称过程必然通向现稿。
+本文是根据[发生记录](archaeology.md)与[讨论记录](../what-is-bug-discussion-log.md)作出的概念重构，不代替原始消息，也不声称过程必然通向现稿。
 
 ## 1. 主干：关系判断与三个构成方面
 
