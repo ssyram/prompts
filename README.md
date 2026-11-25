@@ -48,6 +48,8 @@
 
 ### 辅助 prompt
 
+- [`what-is-bug`](current/what-is-bug.md): 以规范意图、合法可达与后果组成的关系判断定义 Bug，按论域和严格度检查一项 Bug 论证是否成立。[讨论与历史](docs/what-is-bug/README.md)记录从 PR 审查争议到通用认识论框架的形成过程。
+
 - [`occams-razor`](current/occams-razor.md): 围绕既定对象重建其有效目标链与实际语境，递归删除可证明没有必要贡献的内容，并在交付前复查是否仍可收缩或因裁剪失去解释与充分性。其 QPDI 设计见 [`principles.md`](docs/occams-razor/principles.md)（Q）、[`architecture.md`](docs/occams-razor/architecture.md)（P/D）；真实语境重校准回放见 [`context-recalibration-cases.md`](docs/occams-razor/context-recalibration-cases.md)。
 - [`write-technical-report`](current/write-technical-report.md): 围绕实际任务、材料和读者撰写或改写技术报告、方案和设计说明；先交代必要的对象、关系、条件与证据，再删除没有当前贡献的表达。其脱敏研究、QPDI和候选过程文档见 [`docs/write-technical-report/_draft/README.md`](docs/write-technical-report/_draft/README.md)。
 - `finegrained-check`: 适合做更细粒度的检查或补充验证。
