@@ -19,7 +19,7 @@ Do not treat session count, tool activity, or a fixed report template as the goa
 ## QPDI Design
 
 - **Q**: help the user recover each relevant conversation path, understand the day's actual work and working state, resume still-relevant work across days, and draw only grounded conclusions about what changed, what was learned, and what remains open.
-- **P**: distinct paths are not collapsed into a false linear history; shared history and repeated progress are counted once; work progress is distinct from conversation history; important conclusions can be traced back; the report reflects the user's actual energy distribution across stacks; time and attention claims keep their evidence boundary; execution and user reception remain distinct; cross-day reminders serve an evidenced next step; the output contains no repeated or unsupported material.
+- **P**: distinct paths are not collapsed into a false linear history; shared history and repeated progress are counted once; directing effort, understanding gained, and actual work progress remain distinct; important conclusions can be traced back; the report reflects the user's actual energy distribution across stacks; time and attention claims keep their evidence boundary; execution and user reception remain distinct; cross-day reminders serve an evidenced next step; the output contains no repeated or unsupported material.
 - **D**: `find` → `distinguish conversation paths when needed` → `recalibrate each transcript` → `integrate working stacks and relevant carryovers` → `analyse how` → `render`.
 - **I**: inspect relevant session records, recent reports, and only the artifacts or command results needed to support the requested claims; write the requested report and evidence packets.
 
@@ -39,6 +39,25 @@ Establish the local date, timezone, cutoff, allowed evidence sources, and scope:
 6. Exclude synthetic delegated-task and steering messages from human-message counts, but retain them as execution evidence when relevant.
 
 Every in-scope path must be represented. Work on a path still counts after the user leaves it, but its last answer does not become the current conclusion unless later work carries it forward. Use the supported current path for conversational state and verified artifacts for artifact state. Repeated wording alone is not a reason to merge two actions; shared source entries and repeated work progress are still counted only once.
+
+### Incremental collection with find-all.py
+
+For incremental updates (`more`), start with the collector shipped in this skill:
+
+```bash
+python3 <skill-dir>/scripts/find-all.py --since 'YYYY-MM-DDTHH:MM' \
+    [--until '...'] [--anomaly 'KEY,...'] [--out FILE]
+```
+
+It auto-discovers Pi (`~/.pi/agent/sessions`), Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`) JSONL sessions and OpenCode SQLite stores, normalizes timestamps to Asia/Hong_Kong, and lists every session's user-role messages (`{provider, path, session, messages:[{time,text}]}`). It does no filtering itself.
+
+Then work the list in three moves:
+
+1. **Filter obvious system prompts** — drop auto templates: supervision/watchdog loops, delegated worker briefs (`Task:`, `你是已派发…`), probe messages (`say hi`, `noop`, `go`, `Reply OK`), `Inspect subagent`, steering/queued follow-ups, task-system echoes. User-role alone never proves a human.
+2. **Trace the causal chain before each surviving message** — for each real human message, read the source between the previous boundary (since/last message) and this message, entry by entry, to reconstruct what this message is responding to. Never summarize a user remark without its trigger; never report a ruling stripped of the incident that caused it.
+3. **Only then organize** into the normal report structure.
+
+Run with `--anomaly` (邮件/email/SMTP/外发/暂停/越权/凭证/端点/卡死…) for an all-role incident scan. "No new human input" never means "no major event": autonomous-time incidents (safety pauses, outbound attempts, endpoint receipts) are mandatory content even when no human spoke. Huge files are streamed once; never tail-sample only — mid-file exchanges are exactly where incidents live.
 
 ### Read only as deeply as needed
 
@@ -92,8 +111,8 @@ Use this structure; omit the path heading when the transcript is linear:
 
 **How material**
 - What you specified, challenged, verified, redirected, paused, or accepted:
-- What that action changed:
-- Investment signals from this path's distinct user messages:
+- What that action changed in understanding or the work, beyond another presentation of existing material; supporting response/action:
+- Investment signals from this path's distinct user messages, without treating effort as impact:
 
 **Resume point**
 - What remains open and where work should resume:
@@ -126,6 +145,12 @@ For each stack:
 4. retain what happened on paths the user left, while using the supported current path for conversational direction and verified artifacts for artifact state;
 5. preserve links to the transcript paths that support each important statement.
 
+### Contributions across working stacks
+
+Before judging an activity's contribution or cost, recover its evidenced effects on other stacks, projects, or later work, not only its local outcome. Keep independent goals separate while showing what crossed their boundaries: an artifact used, a prerequisite supplied, a judgment changed, or a conflict that caused rework.
+
+Trace `activity/result → receiving work or understanding → concrete use or value`. Support the connection with actual reuse, explicit handoff, user explanation, or a clearly stated inference; shared vocabulary and temporal proximity alone are insufficient. Later usefulness does not prove the original activity was necessary or justify every step taken to obtain it. Count shared contributions and final outcomes once rather than awarding the same outcome anew to every supporting node.
+
 This is the day's **What/How progress material**. Do not extract key outcomes, lessons, or reflection as a parallel account before this integration exists.
 
 ### Ongoing work across days
@@ -136,6 +161,14 @@ Preserve continuity of real work, not a second todo inventory: the user should s
 - For each material item, keep its last dated substantive change, current evidence/cutoff, and next needed action or person. Distinguish AI execution, delivered results awaiting review, and actual blockers. No feedback does not prove unread work; an old running status does not prove present activity. Ordinary completed answers do not automatically become review obligations.
 - Use comparisons to flag potentially dropped work, missing support or reception, and absence of observed progress. Tie reminders to a still-valid goal and useful next step; prioritize consequence and user priorities, not age alone. Missing days are unknown, not proof of stagnation.
 - Start with existing reports; check only source tails or receipts that could change a significant reminder. Reuse resume points in one ongoing-work section, link rather than repeat history, and do not rerun project audits or restart old tasks merely to review their status.
+
+### User TODO inventory in the daily stack
+
+The steward maintains the user's complete TASK/TODO list inside the daily working stack (owner ruling, 2026-11-26):
+
+- Everything the user needs to do is tracked as a root frame / starting item in the day's stack — including items **not yet started but needed**, items the user states explicitly, and items observed that the user is actually doing. A newly stated todo is pushed as a frame immediately.
+- When a task completes, report the completion in that day's report/`more`. Unless the user says otherwise, **pop the frame by default** — it is no longer maintained afterwards. A pop records completion, risk clause, and assessment, per the standing done format.
+- Do not resurrect popped tasks. If the goal re-emerges, it enters as a new frame with fresh evidence.
 
 ## 4. Analyse How
 
@@ -154,6 +187,17 @@ Keep three things separate:
 - **user statement**: what the user explicitly says about their attention or intent;
 - **inference**: a conditional reading of the first two.
 
+### Effective contributions and uses
+
+Ground a contribution in either of these non-exclusive bases:
+
+1. **Observed use or well-supported expected use:** something was actually adopted, or concrete deployment, commitments, or dependencies make its later use reasonably likely. Distinguish used, expected, and merely available; a file's existence alone is insufficient.
+2. **Exploratory, understanding, or prospective value:** the work itself clarified a consequential question, established a useful exclusion, produced something for an agreed feedback process, or has another specific purpose recognized by the user or supported by a clear inference. State that purpose and its grounds; vague "might be useful someday" does not qualify. Apply the uptake rules below when claiming user learning. User approval does not itself establish technical correctness or realized benefit.
+
+An upstream activity can be a contribution node when it demonstrably supports one of these uses or values, including outside its originating project or day. It need not produce an independently usable final artifact. Ground the chain in a supported purpose rather than circular claims that activities justify one another.
+
+Exclude talk or output with no supported contribution from the effective-contribution summary. Missing follow-up alone means unknown, not worthless; foreseeable use remains prospective until realized. Substantial effort without effective progress may still belong in the history or a grounded lesson, not as an achievement.
+
 ### Prior knowledge vs new learning
 
 A problem, concern, correction, rule, theory, or design request stated by the user normally shows what the user already knew or believed before asking. It belongs in direct history, the user's problem framing, or a decision record. It is not evidence that the user learned or should reflect on that same idea today.
@@ -168,15 +212,25 @@ Claim new learning only when the record after an AI answer shows uptake, such as
 
 When this evidence exists, report the **concrete matter itself**: the actual mechanism, fact, distinction, or corrected understanding. Do not replace it with a deep-sounding abstraction. For example, write “the user learned that `.i` is a preprocessed TU and does not contain the real linker configuration,” not “the user learned the tension between form and reality.”
 
-A content-matching follow-up proves that the user read and worked with that specific material; it does not by itself prove unconditional acceptance. Preserve disagreement, correction, and uncertainty.
+A specific content-matching follow-up supports engagement with that point, not full-document reading, new learning, acceptance, or project control. Generic praise and requests for clearer, shorter, or differently structured versions do not establish uptake. Preserve disagreement, correction, and uncertainty.
 
 If an answer exists but no later message shows uptake, omit it from learning; include the answer in direct history when relevant. Mention missing reception only when it affects a substantive judgment or an actual review need, not as a routine disclaimer. Never mine the subject matter of the user's request for a philosophical lesson merely because the problem sounds deep.
 
 Reflection is optional. Include it only when the user explicitly formulates a changed principle, demonstrates a change across turns, or when repeated evidence supports a bounded method update. Otherwise omit it.
 
+### Directing effort is not project control
+
+Judge contribution by what changed in understanding or the work, not time spent directing, instruction count, or versions produced. Closely examine substantial steering with little demonstrated progress.
+
+- Compare the actual content and consequences of successive instructions: rewording/reformatting, new facts or reasoning, and changed decisions or execution are not interchangeable. Name the concrete change; do not classify solely by the requested format.
+- Follow the material into specific uptake, a judgment or action, and its observed effect where evidence exists. Do not invent missing links. A useful artifact can exist without user learning; understanding can improve before implementation; existing understanding can also support an effective decision without new learning.
+- Treat a clearer-looking version as preparation until its intended use is demonstrated, unless the representation itself is the required deliverable. Repeated rewrites, abstraction, sentence/paragraph readings, or generic approval do not by themselves show learning or control. If a rewrite reveals a real gap or changes a decision, preserve that substantive gain.
+- No demonstrated uptake means uptake is unknown, not that the user definitely did not read or that the material is useless. Preserve anxiety or reassurance-seeking as the user's self-interpretation unless independent evidence supports the causal claim.
+- When this distinction matters, revise the overview, history, reflection and next step together. State whether the next need is to use/understand existing material or to transform it for a specific unresolved obstacle; do not automatically prescribe another version or add a scoring ritual.
+
 ### Energy / attention distribution
 
-Determine where the user actually invested attention, and let that ranking shape the whole report: stack order in the overview table, thickness of each stack's history, and the prominence of How material. Uniform treatment of all stacks is a failure mode — low-investment stacks must not read as heavy as deliberate focus.
+Determine where attention went to allocate history and explain friction, not to award progress. Give deliberate focus proportionate detail while prominently showing its actual gains or lack of them; a busy, well-directed-looking conversation is not itself a successful working stack.
 
 Judging criteria, in priority order:
 
@@ -206,15 +260,17 @@ Only challenge the intent itself when its factual foundation collapses entirely 
 
 ### Time and efficiency boundaries
 
-Time can describe response rhythm, content-available windows, elapsed span, or agent runtime. It does not directly prove reading speed, total attention, or a stable personal trait. Evaluate efficiency only when the goal, actual result, and relevant cost or friction are all known; otherwise report the observed progress and friction without scoring it.
+Time can describe response rhythm, content-available windows, elapsed span, or agent runtime. It does not directly prove reading speed, total attention, or a stable personal trait. Judge whether a contribution exists separately from whether the effort was proportionate: useful results can be obtained inefficiently, and effort does not create value by itself. Evaluate efficiency only when the goal, actual result, and relevant cost or friction are known; otherwise report progress and cost uncertainty without inventing a ratio or score.
+
+Assess the increment against what was already available. If a lengthy discussion merely recovers an existing rule, record recall rather than a new design contribution; credit changed understanding or use only when supported. Before adding to a skill, plan, or report, compare the proposed requirement with its existing content. Do not manufacture additions to justify the discussion. When substantial repetition produced no effective increment, retain the cost or lesson without promoting it to a contribution node.
 
 ### Report ordering and thickness
 
-Order stacks by the user's energy ranking (highest first), not by transcript number or chronology. Thickness must follow the same ranking:
+Lead with what advanced the user's goals and any consequential shortfall, not transcript order or activity volume. Use attention to allocate explanatory detail, never as a substitute for contribution:
 
-- the main-investment stacks get the fullest direct history and How material;
-- low-investment stacks get proportionally compressed treatment — their detail lives in the evidence packets;
-- show the main focus through the user's concrete follow-ups and decisions; keep scoring criteria and mechanical statistics in the evidence files, not a methodology block in the report.
+- give major investments enough history to explain both gains and costly non-progress;
+- compress minor threads while retaining a brief but consequential decision or discovery;
+- distinguish substantive direction from repeated presentation requests in the main account; keep mechanical statistics and assessment instructions in evidence files.
 
 ### Raw data for energy assessment
 
@@ -275,6 +331,22 @@ Use separate rows for distinct in-scope paths only when the source supports that
 
 Write one local packet per transcript from section 2. Distinguish its conversation paths inside the packet only when needed. These files are detailed, recoverable histories, not copied session archives.
 
+### Steward working stack (steward mode)
+
+When the user has granted the report assistant steward duty (2026-11-05 authorization: "你作为汇总者正式拥有了帮我管理多线的职责"), after rendering the report also maintain the day's steward working stack in the log repo:
+
+- Create or update `ws-<YYYYMMDD>` via the `working-stack` binary when available (`.working-stack/` in the log repo); fall back to a hand-maintained Markdown stack only when the binary is unusable.
+- Leaves = each work line's latest real progress (one frame per line; a session may own several lines). Frame titles prefixed 【等待你】 mark lines waiting for the user's own confirmation/ruling; all other leaves are executing lines. The binary's single-TOP focus model must not be read as "paused = stopped" — real status lives in each frame's `goal` text.
+- Report the line inventory in the reply using the steward format, in plain language (/explain): one block per line, opening with a one-sentence 背景 recap of what the whole thing is (assume a conservative memory: no abbreviations or codewords without a gloss, but never re-teach what the user personally said), then 前沿 = latest progress and newest facts. Lines marked 【等待你】 must state the awaited action concretely: what to do, where (TUI/command/file), and what stalls without it. Executing lines report only the frontier, no decision-nagging.
+- Frame advance/transition follows **the user's messages only**, never AI execution behavior: a line's frame changes state only when the user signals an explicit attitude — 明确继续基于当前讨论推进 (advance), 明确接受 or 明确拒绝 (close). AI-side progress updates the `goal` text, not the frame lifecycle.
+- **Silent-success tails**: when a task on a line completes silently (the user ordered it but has not seen the result), do not drop it — keep a 【已毕待知】 frame and remind the user in every steward report until an explicit signal (advance further, accept, or reject) arrives; before that, assume the user does not know. Such frames carry across days.
+- **Universal done format**: every done carries **risk clauses and an assessment** — no done is complete; risk differs only in size. Pop records and report summaries uniformly write: **outcome + risk clause + assessment** (assessment = mastery mode [hand-calibrated / judged from output / fully delegated] and confidence [low/medium/high]). "Risk-default done" (user has not examined details, judges by final effect, no incident = OK) is only the most conspicuous typical form, not a separate class; when risk is salient the record must make it felt, never passing it off as reviewed acceptance.
+- **Attitude inference for pending results (core abstraction)**: for every pending work/temporary result, infer the user's actual attitude from their cross-session temporal causality — did this work (including interim results) later manifest in some way, or not at all? Silence may mean default-acceptance, forgetting what the session was doing, or a temporary topic switch; distinguish these. Handling spectrum: most conservative = legitimately treat as "changed but unconfirmed" and remind the user they may have forgotten (fully correct and acceptable); smarter = notice the deliverable being directly exercised by later work (e.g. the round after a bare "more") = tacit live testing ("test state" is merely a typical case of this abstraction, not the mechanism itself).
+- **Three-day expire rule**: a pending item repeatedly ignored may be in default or expiring; **three days with no further advance and no user extension = default expire** — stop reminding, but record one line in that day's report that the item expired (expire carries larger risk; it is not acceptance).
+- **Engineering discipline**: reusable operations are固化 as scripts (in `.pi/`) invoked with usage notes, never re-inlined by hand each time; the collector lives at `.pi/collect-increment.py`.
+- Carry-over lines from previous days stay as frames until closed by a user decision; do not silently drop them.
+- Report the line inventory (executing vs waiting-for-user) in the reply and in the report's ongoing section.
+
 ### `REPORT.md`
 
 `REPORT.md` is the final integration. Organize it by working stack, not by a flat transcript timeline.
@@ -311,13 +383,13 @@ Write one local packet per transcript from section 2. Distinguish its conversati
 ### Energy distribution
 <Which stacks received the user's attention, shown through concrete follow-ups and decisions; do not explain the assessment procedure.>
 ### How you made decisions
-<Corrected AI, changed direction, verified work; engagement modes (rule-setting / probing / steering).>
+<What a significant instruction changed in understanding or the work; distinguish substantive direction and demonstrated uptake from another presentation of existing material.>
 <Concrete answer material that later user messages demonstrably took up; state the matter itself, not an abstraction of it.>
 <Concrete friction and what it cost or prevented:>
 <Lessons or communication methods only when the user explicitly formed or demonstrated them, with conditions and limits:>
 
-## Key Nodes and Results
-<Extract only the genuinely important decisions, outcomes, and limits already shown above. Do not create a second account.>
+## Effective Contributions and Uses
+<Briefly summarize the meaningful contributions already established: what changed, whom or which work it serves (including another project), and whether its value is realized, expected, or exploratory. Include necessary supporting nodes and consequential effort/friction without repeating the full history or counting a shared outcome multiple times. Use a short list or compact table, not node counts, scores, or a second results section; omit when nothing qualifies.>
 
 ## Reflection and Recalibration
 <Optional. Include only an explicit or demonstrable change in the user's own principle or method. A problem the user brought to the AI is prior problem awareness, not today's reflection. When the user learned from an answer, report the concrete matter under How instead of philosophically rewrapping it here. Omit this section when no independent reflection is supported.>
