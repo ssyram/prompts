@@ -1,6 +1,6 @@
 ---
 name: auto-proof-trajectory-audit
-description: 给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定。v3.1 基于宪法 v7.1（PA reject 不是 dead-end + forward-progress liveness predicate; v7.0: PA 重写为 escalation gate / PR / PI / PL 新立 / 精神 A+B + 5 条安全核心）+ canada/ciim/imo/sphere-packing-3 四 session + ciim v7.0 实证基线
+description: '给定 transitions.jsonl + yaml + 设计文档三输入，对 auto-proof-cc 一次运行的每个 transition 做精神符合度评判、非最短路径根因分析、模型能力 vs 流程设计二分判定。v3.1 基于宪法 v7.1（PA reject 不是 dead-end + forward-progress liveness predicate; v7.0: PA 重写为 escalation gate / PR / PI / PL 新立 / 精神 A+B + 5 条安全核心）+ canada/ciim/imo/sphere-packing-3 四 session + ciim v7.0 实证基线'
 ---
 
 # Auto-Proof Trajectory Audit (v3.1)

@@ -149,6 +149,35 @@ For every call to an external API or separate module:
 # VERIFIED: session-manager source, line ~90 — "Does NOT participate in LLM context"
 ```
 
+## Verdict Discipline (binding)
+
+A verdict is only as strong as its weakest gate. These are hard requirements, not style advice.
+
+### Verdict tiers
+
+- **PROVEN** — every path traced, every branch case-split, every loop measure stated, AND a recorded counterexample attempt for each claimed invariant. "Looks right" and "passed all gates" are never PROVEN.
+- **PARTIAL** — anything less, with an explicit list of what was not covered (paths skipped, inputs unconsidered, calls untraced). An unlisted gap makes a PARTIAL verdict dishonest.
+- **INVALID** — spec unverified or no design doc (Rule 7). The audit then certifies nothing about intent.
+
+### Evidence labels on load-bearing claims
+
+Every load-bearing claim (root cause, "invariant holds", "caller guarantees X", resource safety) states its evidence at first mention:
+
+- **[source]** — read in actual code/doc; cite a function-name or unique-string anchor.
+- **[derived]** — from listed premises via a stated rule.
+- **[assumption]** — reason for adopting it, and the scope it affects.
+- **[unresolved]** — the missing artifact/path named.
+
+Consistency is not truth: multiple agreeing reports that share an unverified premise are one source. Green gates, self-checks, and agent self-reports prove process completion, not correctness.
+
+### Counterexample obligation
+
+Before judging an invariant CORRECT, construct the minimal input or state that would break it, then show why it is unreachable or rejected. If you cannot articulate the attack, the verdict is PARTIAL — you have not yet understood the invariant.
+
+### Scope discipline
+
+State the object, level, version, and quantifier of every conclusion. "Checked layer X" does not escalate to "the system checks X"; "no Y found in inspected files" does not become "Y does not exist". Wider scope requires a bridging premise; without one, keep the narrower claim.
+
 ## What to Annotate (Checklist)
 
 For each function, verify:
@@ -162,6 +191,8 @@ For each function, verify:
 | **Connection / Lifecycle** | What is the external connection model? Short-lived / persistent? Disconnect side-effects? Are session lifecycle assumptions valid? |
 | **Concurrency Contracts** | What are the shared resources? Lock acquisition order? Rely (environment promises) / Guarantee (self promises)? |
 | **Exception safety** | If line N throws, what state is left? Are invariants preserved? |
+| **Counterexample attempt** | For each claimed invariant: was a minimal breaking input constructed and its unreachability/rejection shown? |
+| **Evidence labels** | Do load-bearing claims carry [source]/[derived]/[assumption]/[unresolved] status at first mention? |
 
 ## Multi-Angle Decomposition
 
@@ -199,3 +230,7 @@ Brief reminders of patterns seen repeatedly across audit loops. Language-agnosti
 - **Line citations drift.** `file:line` is stale after the next edit. Prefer function-name anchors, unique-string anchors, or a "lines are approximate" caveat.
 - **Dead code is a signal.** Unused exports, unreachable branches, stale comments are often remnants of design changes. Before deleting, verify whether an invariant at a distance makes them "unreachable"; if so, keep as defense-in-depth.
 - **Disk is authoritative; memory is a cache.** For state that crosses process boundaries, design the persisted form first and treat in-memory as derived.
+- **Structural type legality ≠ runtime premises.** A typed field can be a mutating getter; a real Array can carry a hostile iterator; a returned object can be the caller's mutable instance. Verify stability/immutability at the boundary that relies on it, not at the declaration.
+- **Synchronous catch does not absorb a wrongly-async return's later rejection.** Proving "no throw escapes" on a sync path says nothing about the rejected promise nobody awaits — that rejection escapes your containment later, at the host's mercy.
+- **Wrapper guarantees derive from actual outputs, not declared signatures.** When you wrap/delegate an interface, re-derive your containment against everything the delegate can return at runtime (wrong shapes, thenables, throwing getters); the wrapper inherits every divergence.
+- **Know who validates returns at framework boundaries.** If the framework writes provider/handler return values straight into state without clamping or shape checks, the return-contract burden is yours. Verify the consumer before assuming "the framework will handle it".
